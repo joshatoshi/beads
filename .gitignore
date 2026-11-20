@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+*.bak
+*.tmp
+*.swp
+*~
+.mcp-backups/
+.lane/
+.pio/
+build/
+firmware/build/
+venv/
+.venv/
