@@ -1,5 +1,6 @@
 #include "hal.h"
 #include "board_pins.h"
+#include "usb_ep0.h"
 #include <string.h>
 
 /* ============================================================================
@@ -98,12 +99,16 @@
 #define USB_BUF_CTRL_OUT(ep) REG32(USB_DPRAM_BASE + 0x0084u + ((ep) * 8u))
 #define USB_EP0_BUF0         ((volatile uint8_t *)(USB_DPRAM_BASE + 0x0100u))
 #define USB_EP1_OUT_BUF      ((volatile uint8_t *)(USB_DPRAM_BASE + 0x0180u))
+#define USB_EP2_IN_BUF       ((volatile uint8_t *)(USB_DPRAM_BASE + 0x0200u))
+#define USB_EP3_OUT_BUF      ((volatile uint8_t *)(USB_DPRAM_BASE + 0x0240u))
+#define USB_EP3_IN_BUF       ((volatile uint8_t *)(USB_DPRAM_BASE + 0x0280u))
 
 #define USB_ADDR_ENDP        REG32(0x50110000u)
 #define USB_MAIN_CTRL        REG32(0x50110040u)
 #define USB_SIE_CTRL         REG32(0x5011004Cu)
 #define USB_SIE_STATUS       REG32(0x50110050u)
 #define USB_BUFF_STATUS      REG32(0x50110058u)
+#define USB_EP_STALL_ARM     REG32(0x50110068u)
 #define USB_USB_MUXING       REG32(0x50110074u)
 #define USB_USB_PWR          REG32(0x50110078u)
 
@@ -119,6 +124,7 @@ static const uint8_t DAC_CS_PINS[4] = {
 
 static uint8_t  s_last_adc_ch = 0xFFu;
 static uint32_t s_saved_primask[2] = { 0u, 0u };
+static bool     s_spi_pwr_enabled = false;
 
 /* Inter-core SRAM lockout handshake for XIP-off QSPI Flash programming */
 static volatile uint32_t s_core0_lockout_req = 0u;
@@ -293,13 +299,14 @@ void hal_init(void) {
     UART0_LCR_H = (3u << 5u) | (1u << 4u);
     UART0_CR = (1u << 9u) | (1u << 0u);
 
-    /* SPI0 (GPIO18=SCK, GPIO19=TX, FUNCSEL=1, 16-bit Mode 0 @ 12.0 MHz <= 20 MHz MCP4822 max) */
-    IO_BANK0_CTRL(PIN_SPI0_SCK) = 1u;
-    IO_BANK0_CTRL(PIN_SPI0_TX) = 1u;
+    /* SPI0 (GPIO18=SCK, GPIO19=TX, 16-bit Mode 0 @ 12.0 MHz <= 20 MHz MCP4822 max) */
     SPI0_CR1 = 0u;
     SPI0_CPSR = 4u;       /* 48 MHz / 4 = 12.0 MHz */
     SPI0_CR0 = 0x000Fu;   /* DSS=15 (16-bit), SPO=0, SPH=0 */
     SPI0_CR1 = (1u << 1u);
+    /* Force SPI0 + ~CS lines to safe state matching PEDAL_PWR_GOOD (LOW in USB-only mode!) */
+    s_spi_pwr_enabled = !hal_gpio_read(PIN_PEDAL_PWR_GOOD);
+    hal_spi_dac_set_power_safe(hal_gpio_read(PIN_PEDAL_PWR_GOOD));
 
     /* I2C0 (GPIO4=SDA, GPIO5=SCL, FUNCSEL=3, 400 kHz Fast Mode @ 120 MHz CLK_SYS) */
     IO_BANK0_CTRL(PIN_I2C0_SDA) = 3u;
@@ -313,6 +320,27 @@ void hal_init(void) {
     /* SAR ADC enable */
     ADC_CS = (1u << 0u);
     s_last_adc_ch = 0xFFu;
+}
+
+void hal_spi_dac_set_power_safe(bool pedal_pwr_good) {
+    const uint32_t cs_mask = (1u << PIN_CS_DAC0_N) | (1u << PIN_CS_DAC1_N) |
+                             (1u << PIN_CS_DAC2_N) | (1u << PIN_CS_DAC3_N);
+    const uint32_t spi_mask = (1u << PIN_SPI0_SCK) | (1u << PIN_SPI0_TX);
+    if (!pedal_pwr_good) {
+        /* USB-only / brownout defense-in-depth: drive SPI0 + all ~CS GPIOs strictly LOW (0V) */
+        IO_BANK0_CTRL(PIN_SPI0_SCK) = 5u; /* SIO */
+        IO_BANK0_CTRL(PIN_SPI0_TX)  = 5u; /* SIO */
+        SIO_GPIO_OUT_CLR = spi_mask | cs_mask;
+        SIO_GPIO_OE_SET  = spi_mask | cs_mask;
+        s_spi_pwr_enabled = false;
+    } else if (!s_spi_pwr_enabled) {
+        /* +5V_BUCK present: deassert ~CS HIGH and connect SPI0 peripheral */
+        SIO_GPIO_OUT_SET = cs_mask;
+        SIO_GPIO_OE_SET  = cs_mask;
+        IO_BANK0_CTRL(PIN_SPI0_SCK) = 1u; /* SPI0_SCK */
+        IO_BANK0_CTRL(PIN_SPI0_TX)  = 1u; /* SPI0_TX */
+        s_spi_pwr_enabled = true;
+    }
 }
 
 void hal_spi_dac_write16(uint8_t dac_idx, uint16_t word) {
@@ -477,6 +505,12 @@ bool hal_flash_erase_and_program(uint32_t slot_idx, const void *src, size_t len)
     while ((s_core0_parked_ram == 0u) && ((uint32_t)(hal_time_us_32() - wait_start) < 5000u)) {
         __asm__ volatile("nop");
     }
+    if (s_core0_parked_ram == 0u) {
+        /* Core 0 did not park in SRAM: ABORT cleanly to prevent XIP HardFault! */
+        s_core0_lockout_req = 0u;
+        __asm__ volatile("dmb\nsev" ::: "memory");
+        return false;
+    }
 
     flash_do_erase_program_in_ram(flash_off, prog_len, f_conn, f_exit, f_ers, f_prg, f_flsh, f_xip);
 
@@ -496,45 +530,23 @@ void hal_reset_usb_boot(uint32_t usb_activity_gpio_pin_mask, uint32_t disable_in
 }
 
 /* ============================================================================
- * Bare-Metal RP2040 USB Device Stack (USB-MIDI Bulk OUT EP1 + CDC 1200bps Reset)
+ * Bare-Metal RP2040 USB Device Stack (Composite USB-MIDI + CDC-ACM 1200bps)
+ * Uses shared multi-packet EP0 engine (usb_ep0.c) verified by host unit tests.
  * ============================================================================ */
-static uint8_t  s_usb_pending_addr = 0u;
-static bool     s_usb_expect_line_coding = false;
+static usb_ep0_state_t s_ep0;
+static uint8_t  s_ep1_pid = 0u;
+static uint8_t  s_ep3_out_pid = 0u;
 static uint8_t  s_usb_midi_rx_q[64];
 static uint8_t  s_usb_midi_q_len = 0u;
 static uint8_t  s_usb_midi_q_pos = 0u;
 
-static const uint8_t USB_DEV_DESC[18] = {
-    18u, 0x01u, 0x00u, 0x02u, 0xEFu, 0x02u, 0x01u, 64u,
-    0x8Au, 0x2Eu, /* VID: Raspberry Pi */
-    0x0Au, 0x00u, /* PID: RP2040 Composite MIDI + CDC */
-    0x00u, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u
-};
-
-/* Composite Configuration: AudioControl(IF0) + MIDIStreaming(IF1, EP1 OUT) + CDC(IF2, 1200bps reset) */
-static const uint8_t USB_CFG_DESC[] = {
-    /* Config Header (9) */
-    9u, 0x02u, 84u, 0x00u, 3u, 1u, 0u, 0x80u, 100u,
-    /* IF0: Audio Control (9 + 9) */
-    9u, 0x04u, 0u, 0u, 0u, 0x01u, 0x01u, 0x00u, 0u,
-    9u, 0x24u, 0x01u, 0x00u, 0x01u, 9u, 0x00u, 1u, 1u,
-    /* IF1: MIDI Streaming (9 + 7 + 6 + 9 + 5 = 36) */
-    9u, 0x04u, 1u, 0u, 1u, 0x01u, 0x03u, 0x00u, 0u,
-    7u, 0x24u, 0x01u, 0x00u, 0x01u, 22u, 0x00u,
-    6u, 0x24u, 0x02u, 0x01u, 0x01u, 0u,
-    9u, 0x05u, 0x01u, 0x02u, 64u, 0x00u, 0u, 0u, 0u,
-    5u, 0x25u, 0x01u, 1u, 1u,
-    /* IF2: Minimal CDC ACM Control Interface for 1200-baud picotool touch (9 + 5 + 5 + 4 = 23 -> total 86? 9+18+36+21=84!) */
-    9u, 0x04u, 2u, 0u, 0u, 0x02u, 0x02u, 0x01u, 0u,
-    5u, 0x24u, 0x00u, 0x10u, 0x01u,
-    4u, 0x24u, 0x02u, 0x02u,
-    3u, 0x24u, 0x06u, 2u
-};
-
-static void usb_ep0_tx(const uint8_t *data, uint16_t len, uint8_t pid) {
-    if (len > 64u) len = 64u;
-    for (uint16_t i = 0u; i < len; i++) {
-        USB_EP0_BUF0[i] = data[i];
+static void rp_ep0_tx(void *ctx, const uint8_t *data, uint16_t len, uint8_t pid) {
+    (void)ctx;
+    if (len > BEADS_USB_EP0_MAX_PKT) len = BEADS_USB_EP0_MAX_PKT;
+    if (data != NULL) {
+        for (uint16_t i = 0u; i < len; i++) {
+            USB_EP0_BUF0[i] = data[i];
+        }
     }
     uint32_t ctrl = (uint32_t)len | (1u << 15u) | ((pid ? 1u : 0u) << 13u);
     USB_BUF_CTRL_IN(0u) = ctrl;
@@ -542,113 +554,132 @@ static void usb_ep0_tx(const uint8_t *data, uint16_t len, uint8_t pid) {
     USB_BUF_CTRL_IN(0u) = ctrl | (1u << 10u); /* AVAILABLE */
 }
 
-static void usb_ep0_rx_arm(uint16_t max_len, uint8_t pid) {
+static void rp_ep0_rx_arm(void *ctx, uint16_t max_len, uint8_t pid) {
+    (void)ctx;
+    if (max_len > BEADS_USB_EP0_MAX_PKT) max_len = BEADS_USB_EP0_MAX_PKT;
     uint32_t ctrl = (uint32_t)max_len | ((pid ? 1u : 0u) << 13u);
     USB_BUF_CTRL_OUT(0u) = ctrl;
     __asm__ volatile("nop\nnop\nnop");
     USB_BUF_CTRL_OUT(0u) = ctrl | (1u << 10u);
 }
 
-static void usb_ep1_out_arm(uint8_t pid) {
+static void rp_ep0_stall(void *ctx) {
+    (void)ctx;
+    USB_EP_STALL_ARM = (1u << 0u) | (1u << 1u);
+    USB_BUF_CTRL_IN(0u)  = (1u << 11u); /* STALL */
+    USB_BUF_CTRL_OUT(0u) = (1u << 11u);
+}
+
+static void rp_ep1_out_arm(uint8_t pid) {
     uint32_t ctrl = 64u | ((pid ? 1u : 0u) << 13u);
     USB_BUF_CTRL_OUT(1u) = ctrl;
     __asm__ volatile("nop\nnop\nnop");
     USB_BUF_CTRL_OUT(1u) = ctrl | (1u << 10u);
 }
 
+static void rp_ep3_out_arm(uint8_t pid) {
+    uint32_t ctrl = 64u | ((pid ? 1u : 0u) << 13u);
+    USB_BUF_CTRL_OUT(3u) = ctrl;
+    __asm__ volatile("nop\nnop\nnop");
+    USB_BUF_CTRL_OUT(3u) = ctrl | (1u << 10u);
+}
+
+static void rp_set_address(void *ctx, uint8_t addr) {
+    (void)ctx;
+    USB_ADDR_ENDP = addr & 0x7Fu;
+}
+
+static void rp_on_configured(void *ctx, uint8_t config_val) {
+    (void)ctx;
+    (void)config_val;
+    s_ep1_pid = 0u;
+    s_ep3_out_pid = 0u;
+    rp_ep1_out_arm(0u);
+    rp_ep3_out_arm(0u);
+}
+
+static void rp_on_1200baud_reset(void *ctx) {
+    (void)ctx;
+    rp2040_delay_us(2000u);
+    hal_reset_usb_boot(0u, 0u);
+}
+
+static const usb_ep0_hw_t RP_USB_EP0_HW = {
+    .ep0_tx            = rp_ep0_tx,
+    .ep0_rx_arm        = rp_ep0_rx_arm,
+    .ep0_stall         = rp_ep0_stall,
+    .set_address       = rp_set_address,
+    .on_configured     = rp_on_configured,
+    .on_1200baud_reset = rp_on_1200baud_reset,
+    .ctx               = NULL,
+};
+
 void hal_usb_init_on_core1(void) {
+    usb_ep0_init(&s_ep0);
+    s_ep1_pid = 0u;
+    s_ep3_out_pid = 0u;
+    s_usb_midi_q_len = 0u;
+    s_usb_midi_q_pos = 0u;
+
     memset((void *)USB_DPRAM_BASE, 0, 4096u);
     USB_USB_MUXING = (1u << 0u) | (1u << 3u); /* TO_PHY | SOFTCON */
     USB_USB_PWR    = (1u << 2u) | (1u << 3u); /* VBUS_DETECT | OVERRIDE_EN */
     USB_MAIN_CTRL  = 1u;                      /* CONTROLLER_EN (Device mode) */
     USB_SIE_CTRL   = (1u << 29u);             /* EP0_INT_1BUF */
 
-    /* Configure EP1 OUT Bulk at DPRAM offset 0x0180 */
+    /* Configure EP1 OUT (MIDI Bulk @ 0x0180), EP2 IN (CDC Int @ 0x0200),
+     * EP3 OUT (CDC Data Bulk @ 0x0240), EP3 IN (CDC Data Bulk @ 0x0280) */
     USB_EP_CTRL(1u, 0u) = (1u << 31u) | (2u << 26u) | 0x0180u;
-    usb_ep1_out_arm(0u);
+    USB_EP_CTRL(2u, 1u) = (1u << 31u) | (3u << 26u) | 0x0200u;
+    USB_EP_CTRL(3u, 0u) = (1u << 31u) | (2u << 26u) | 0x0240u;
+    USB_EP_CTRL(3u, 1u) = (1u << 31u) | (2u << 26u) | 0x0280u;
+    rp_ep1_out_arm(0u);
+    rp_ep3_out_arm(0u);
 
     USB_SIE_CTRL |= (1u << 16u);              /* PULLUP_EN = 1 */
 }
 
 void hal_usb_task_on_core1(void) {
-    static uint8_t s_ep1_pid = 0u;
     uint32_t sie = USB_SIE_STATUS;
 
     /* Bus Reset */
     if ((sie & (1u << 19u)) != 0u) {
         USB_SIE_STATUS = (1u << 19u);
         USB_ADDR_ENDP = 0u;
-        s_usb_pending_addr = 0u;
+        usb_ep0_bus_reset(&s_ep0);
         s_ep1_pid = 0u;
-        usb_ep1_out_arm(0u);
+        s_ep3_out_pid = 0u;
+        rp_ep1_out_arm(0u);
+        rp_ep3_out_arm(0u);
     }
 
     /* EP0 SETUP packet received */
     if ((sie & (1u << 17u)) != 0u) {
         USB_SIE_STATUS = (1u << 17u);
-        uint8_t bmReq = USB_SETUP_PKT[0];
-        uint8_t bReq  = USB_SETUP_PKT[1];
-        uint16_t wVal = (uint16_t)USB_SETUP_PKT[2] | ((uint16_t)USB_SETUP_PKT[3] << 8u);
-        uint16_t wLen = (uint16_t)USB_SETUP_PKT[6] | ((uint16_t)USB_SETUP_PKT[7] << 8u);
-
-        if (bmReq == 0x80u && bReq == 0x06u) {
-            /* GET_DESCRIPTOR */
-            uint8_t dtype = (uint8_t)(wVal >> 8u);
-            if (dtype == 0x01u) {
-                uint16_t n = (wLen < sizeof(USB_DEV_DESC)) ? wLen : (uint16_t)sizeof(USB_DEV_DESC);
-                usb_ep0_tx(USB_DEV_DESC, n, 1u);
-                usb_ep0_rx_arm(64u, 1u);
-            } else if (dtype == 0x02u) {
-                uint16_t n = (wLen < sizeof(USB_CFG_DESC)) ? wLen : (uint16_t)sizeof(USB_CFG_DESC);
-                usb_ep0_tx(USB_CFG_DESC, n, 1u);
-                usb_ep0_rx_arm(64u, 1u);
-            } else {
-                usb_ep0_tx(NULL, 0u, 1u);
-            }
-        } else if (bmReq == 0x00u && bReq == 0x05u) {
-            /* SET_ADDRESS */
-            s_usb_pending_addr = (uint8_t)(wVal & 0x7Fu);
-            usb_ep0_tx(NULL, 0u, 1u);
-        } else if (bmReq == 0x00u && bReq == 0x09u) {
-            /* SET_CONFIGURATION */
-            s_ep1_pid = 0u;
-            usb_ep1_out_arm(0u);
-            usb_ep0_tx(NULL, 0u, 1u);
-        } else if (bmReq == 0x21u && bReq == 0x20u && wLen >= 7u) {
-            /* CDC SET_LINE_CODING -> receive 7-byte payload on EP0 OUT */
-            s_usb_expect_line_coding = true;
-            usb_ep0_rx_arm(64u, 1u);
-        } else {
-            /* ACK other control requests cleanly (e.g., SET_CONTROL_LINE_STATE 0x22) */
-            usb_ep0_tx(NULL, 0u, 1u);
+        uint8_t setup[8];
+        for (uint8_t i = 0u; i < 8u; i++) {
+            setup[i] = USB_SETUP_PKT[i];
         }
+        usb_ep0_handle_setup(&s_ep0, setup, &RP_USB_EP0_HW);
     }
 
     uint32_t bstat = USB_BUFF_STATUS;
     if (bstat != 0u) {
-        /* EP0 IN complete (bit 0) -> latch pending USB device address */
+        /* EP0 IN complete (bit 0) -> multi-packet continuation or pending SET_ADDRESS */
         if ((bstat & (1u << 0u)) != 0u) {
             USB_BUFF_STATUS = (1u << 0u);
-            if (s_usb_pending_addr != 0u) {
-                USB_ADDR_ENDP = s_usb_pending_addr;
-                s_usb_pending_addr = 0u;
-            }
+            usb_ep0_on_in_complete(&s_ep0, &RP_USB_EP0_HW);
         }
-        /* EP0 OUT complete (bit 1) -> inspect CDC SET_LINE_CODING dwDTERate */
+        /* EP0 OUT complete (bit 1) -> CDC SET_LINE_CODING payload or IN status ZLP */
         if ((bstat & (1u << 1u)) != 0u) {
+            uint16_t rx_len = (uint16_t)(USB_BUF_CTRL_OUT(0u) & 0x03FFu);
             USB_BUFF_STATUS = (1u << 1u);
-            if (s_usb_expect_line_coding) {
-                s_usb_expect_line_coding = false;
-                uint32_t baud = (uint32_t)USB_EP0_BUF0[0] |
-                                ((uint32_t)USB_EP0_BUF0[1] << 8u) |
-                                ((uint32_t)USB_EP0_BUF0[2] << 16u) |
-                                ((uint32_t)USB_EP0_BUF0[3] << 24u);
-                usb_ep0_tx(NULL, 0u, 1u);
-                if (baud == 1200u) {
-                    rp2040_delay_us(2000u);
-                    hal_reset_usb_boot(0u, 0u);
-                }
+            uint8_t rx_copy[64];
+            if (rx_len > sizeof(rx_copy)) rx_len = (uint16_t)sizeof(rx_copy);
+            for (uint16_t i = 0u; i < rx_len; i++) {
+                rx_copy[i] = USB_EP0_BUF0[i];
             }
+            usb_ep0_on_out_complete(&s_ep0, rx_copy, rx_len, &RP_USB_EP0_HW);
         }
         /* EP1 OUT complete (bit 3) -> queue 4-byte USB-MIDI event packets */
         if ((bstat & (1u << 3u)) != 0u) {
@@ -662,7 +693,18 @@ void hal_usb_task_on_core1(void) {
                 s_usb_midi_q_pos = 0u;
             }
             s_ep1_pid ^= 1u;
-            usb_ep1_out_arm(s_ep1_pid);
+            rp_ep1_out_arm(s_ep1_pid);
+        }
+        /* EP3 OUT complete (bit 7) -> drain & re-arm CDC Data OUT cleanly */
+        if ((bstat & (1u << 7u)) != 0u) {
+            USB_BUFF_STATUS = (1u << 7u);
+            s_ep3_out_pid ^= 1u;
+            rp_ep3_out_arm(s_ep3_out_pid);
+        }
+        /* Clear any unexpected residual status bits safely */
+        uint32_t rest = bstat & ~((1u << 0u) | (1u << 1u) | (1u << 3u) | (1u << 7u));
+        if (rest != 0u) {
+            USB_BUFF_STATUS = rest;
         }
     }
 }

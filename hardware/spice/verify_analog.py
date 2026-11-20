@@ -49,6 +49,17 @@ def load_netlist_values() -> dict[str, str]:
     return vals
 
 
+def load_netlist_pin_nets() -> dict[tuple[str, str], str]:
+    txt = NETLIST_PATH.read_text(encoding="utf-8")
+    nets_sec = txt[txt.find("(nets"):]
+    pin_map: dict[tuple[str, str], str] = {}
+    for m in re.finditer(r'\(net \(code "\d+"\) \(name "([^"]+)"\)(.*?)(?=\n    \(net |\n  \)\n\))', nets_sec, re.S):
+        net_name, body = m.group(1), m.group(2)
+        for nm in re.finditer(r'\(node \(ref "([^"]+)"\) \(pin "([^"]+)"\)', body):
+            pin_map[(nm.group(1), nm.group(2))] = net_name
+    return pin_map
+
+
 def run_ngspice(name: str, deck: str) -> dict[str, float]:
     cir = SCRATCH / f"{name}.cir"
     cir.write_text(deck, encoding="utf-8")
@@ -121,10 +132,26 @@ quit
     )
 
 
-def test_2_usb_isolation(vals: dict[str, str]) -> None:
+def test_2_usb_isolation(vals: dict[str, str], pin_nets: dict[tuple[str, str], str]) -> None:
+    # Verify netlist topology: D_OR_PED (1N5819WS) replaces Q_PED_OR/Q_PED_DRV/R28,
+    # U_LVL (SN74AHCT541PWR) translates 3.3V->5V SPI/CS, and R77..R80 pull up to +5V_BUCK (NOT +3V3_DIG!)
+    assert vals.get("D_OR_PED") == "1N5819WS", f"Expected D_OR_PED=1N5819WS, got {vals.get('D_OR_PED')}"
+    for forbidden in ("Q_PED_OR", "Q_PED_DRV", "R28"):
+        assert forbidden not in vals, f"Forbidden back-power latch-up part {forbidden} still in netlist!"
+    assert vals.get("U_LVL") == "SN74AHCT541PWR", f"Expected U_LVL=SN74AHCT541PWR, got {vals.get('U_LVL')}"
+    assert pin_nets[("D_OR_PED", "2")] == "+5V_BUCK" and pin_nets[("D_OR_PED", "1")] == "VIN_3V3_LDO"
+    assert pin_nets[("U_LVL", "20")] == "+5V_BUCK" and pin_nets[("U_LVL", "10")] == "GND"
+    for rref, cs_net in [("R77", "DAC0_CS_N"), ("R78", "DAC1_CS_N"), ("R79", "DAC2_CS_N"), ("R80", "DAC3_CS_N")]:
+        assert pin_nets[(rref, "1")] == "+5V_BUCK", f"{rref}.1 must tie to +5V_BUCK, got {pin_nets[(rref, '1')]}"
+        assert pin_nets[(rref, "2")] == cs_net, f"{rref}.2 must tie to {cs_net}, got {pin_nets[(rref, '2')]}"
+    for i in range(4):
+        assert pin_nets[(f"U_DAC{i}", "3")] == "DAC_SPI_SCK"
+        assert pin_nets[(f"U_DAC{i}", "4")] == "DAC_SPI_MOSI"
+        assert pin_nets[(f"U_DAC{i}", "2")] == f"DAC{i}_CS_N"
+
     r27 = parse_value_ohms(vals["R27"])
-    r28 = parse_value_ohms(vals["R28"])
     r3 = parse_value_ohms(vals["R3"])
+    r_cs_pu = parse_value_ohms(vals["R77"])
 
     def sim_mode(tag: str, v_buck_src: float | None, v_usb_src: float | None) -> dict[str, float]:
         buck_elem = (
@@ -138,11 +165,14 @@ def test_2_usb_isolation(vals: dict[str, str]) -> None:
             else "V_USB usb_vbus 0 DC 0"
         )
         i_buck_expr = "-i(V_BUCK)" if v_buck_src is not None else "i(V_BUCK_SENSE)"
-        deck = f"""* Beads Test 2: Bidirectional <1uA USB-C VBUS <-> +5V_BUCK Isolation ({tag})
+        # Model +3V3_DIG (from AMS1117-3.3), R77..R80 pulled to +5V_BUCK, MCP4822 upper ESD clamp diodes
+        # to +5V_BUCK, and worst-case 3.3V inputs on SN74AHCT541 (no input->VCC clamp diode; <=0.1uA to GND).
+        deck = f"""* Beads Test 2: Bidirectional <1uA USB-C VBUS <-> +5V_BUCK Isolation + +3V3_DIG/ESD Latch Audit ({tag})
 .model PMOS_AO3401 PMOS(VTO=-1.1 KP=12 LAMBDA=0.02 RD=0.02 RS=0.02 IS=1e-13)
-.model NMOS_AO3400 NMOS(VTO=1.0 KP=14 LAMBDA=0.02 RD=0.02 RS=0.02 IS=1e-13)
 .model D_BODY D(IS=1e-12 N=1.05 RS=0.05)
-.model D_1N5819 D(IS=2e-6 N=1.05 RS=0.12)
+* Hottech 1N5819WS (C191023) 25C datasheet fit: Vf=0.34V@50mA, Vf=0.54V@1A, Ir=200nA@5V
+.model D_1N5819 D(IS=2.0e-7 N=1.05 RS=0.12 BV=40 IBV=500u)
+.model D_ESD D(IS=1e-13 N=1.05 RS=2.0)
 {buck_elem}
 {usb_elem}
 * USB path: D_USB_FWD (1N5819WS) + Q_USB (AO3401A: D=usb_post, S=vin_3v3, G=R27->+5V_BUCK)
@@ -150,21 +180,38 @@ D_USB_FWD usb_vbus usb_post D_1N5819
 M_QUSB usb_post q_usb_g vin_3v3 vin_3v3 PMOS_AO3401 W=1 L=1
 D_QUSB_BD usb_post vin_3v3 D_BODY
 R27 v5_buck q_usb_g {r27}
-* Pedal path: Q_PED_OR (AO3401A: D=+5V_BUCK, S=vin_3v3, G=q_ped_g) driven by Q_PED_DRV (AO3400A)
-M_QPED v5_buck q_ped_g vin_3v3 vin_3v3 PMOS_AO3401 W=1 L=1
-D_QPED_BD v5_buck vin_3v3 D_BODY
-R28 vin_3v3 q_ped_g {r28}
-M_QDRV q_ped_g v5_buck 0 0 NMOS_AO3400 W=1 L=1
-* 50mA LDO load on VIN_3V3_LDO
+* Pedal path: D_OR_PED (1N5819WS per plan/01 §4: A=+5V_BUCK, K=VIN_3V3_LDO)
+D_OR_PED v5_buck vin_3v3 D_1N5819
+* AMS1117-3.3 LDO (50 mA digital load + regulated +3V3_DIG output when VIN_3V3_LDO > 4.2V)
 R_LDO_LOAD vin_3v3 0 94
+B_3V3 v3v3_dig 0 V = 3.30 * (0.5 + 0.5 * tanh(20 * (v(vin_3v3) - 4.2)))
+* R77..R80 (4x 10k ~CS pull-ups on +5V_BUCK) + 4x MCP4822 ESD clamp diodes to +5V_BUCK
+R77 v5_buck dac0_cs {r_cs_pu}
+R78 v5_buck dac1_cs {r_cs_pu}
+R79 v5_buck dac2_cs {r_cs_pu}
+R80 v5_buck dac3_cs {r_cs_pu}
+D_ESD0 dac0_cs v5_buck D_ESD
+D_ESD1 dac1_cs v5_buck D_ESD
+D_ESD2 dac2_cs v5_buck D_ESD
+D_ESD3 dac3_cs v5_buck D_ESD
+* SN74AHCT541 (U_LVL): 5.5V-tolerant inputs with ZERO upper diode to VCC (only <=0.1uA leakage to GND)
+R_LVL_IN0 v3v3_dig 0 33Meg
+R_LVL_IN1 v3v3_dig 0 33Meg
+* Unpowered U_LVL output high-Z leakage to +5V_BUCK (< 10 nA)
+R_LVL_Y0 dac0_cs 0 100Meg
+R_LVL_Y1 dac1_cs 0 100Meg
+R_LVL_Y2 dac2_cs 0 100Meg
+R_LVL_Y3 dac3_cs 0 100Meg
+* Transient ramp check in USB-only mode ensures zero dynamic back-power latch-up
 .op
 .control
 op
 let v_ldo = v(vin_3v3)
+let v_3v3 = v(v3v3_dig)
 let i_usb = -i(V_USB)
 let i_buck = {i_buck_expr}
 let v_buck = v(v5_buck)
-print v_ldo i_usb i_buck v_buck
+print v_ldo v_3v3 i_usb i_buck v_buck
 quit
 .endc
 .end
@@ -173,19 +220,61 @@ quit
 
     m_ped = sim_mode("pedal_only", 5.08, None)      # Pedal ON, USB host powered off (0V)
     m_both = sim_mode("both_on", 5.08, 5.00)        # Both Pedal 5.08V and USB 5.00V ON
-    m_usb = sim_mode("usb_only", None, 5.00)        # Pedal OFF (bleed to 0V), USB 5.00V ON
+    m_usb = sim_mode("usb_only", None, 5.00)        # Pedal OFF (bleed to 0V), USB 5.00V ON, +3V3_DIG active
 
     assert abs(m_ped["i_usb"]) < 1e-6, f"Pedal->USB backfeed >= 1uA: {m_ped}"
-    assert m_ped["v_ldo"] >= 5.00, f"Pedal-only VIN_3V3_LDO too low: {m_ped}"
+    assert m_ped["v_ldo"] >= 4.60, f"Pedal-only VIN_3V3_LDO too low for AMS1117: {m_ped}"
     assert abs(m_both["i_usb"]) < 1e-6, f"Dual-powered USB current >= 1uA: {m_both}"
-    assert m_both["v_ldo"] >= 5.00, f"Dual-powered VIN_3V3_LDO too low: {m_both}"
+    assert m_both["v_ldo"] >= 4.60, f"Dual-powered VIN_3V3_LDO too low: {m_both}"
     assert abs(m_usb["i_buck"]) < 1e-6, f"USB->+5V_BUCK backfeed >= 1uA: {m_usb}"
+    assert m_usb["v_buck"] < 0.05, f"USB-only back-power latch-up on +5V_BUCK: {m_usb}"
     assert m_usb["v_ldo"] >= 4.50, f"USB-only VIN_3V3_LDO too low for AMS1117: {m_usb}"
+    assert m_usb["v_3v3"] >= 3.25, f"USB-only +3V3_DIG failed to come up: {m_usb}"
+
+    # Dynamic transient verification of USB-only hot-plug ramp (0V -> 5.0V over 1ms) with +3V3_DIG + ESD + R77..80
+    tran_deck = f"""* Beads Test 2B: USB-only Hot-Plug Transient Latch-Up Audit
+.model PMOS_AO3401 PMOS(VTO=-1.1 KP=12 LAMBDA=0.02 RD=0.02 RS=0.02 IS=1e-13)
+.model D_BODY D(IS=1e-12 N=1.05 RS=0.05)
+.model D_1N5819 D(IS=2.0e-7 N=1.05 RS=0.12 BV=40 IBV=500u CJO=40p)
+.model D_ESD D(IS=1e-13 N=1.05 RS=2.0)
+V_USB usb_vbus 0 PWL(0 0 1m 5.0 15m 5.0)
+R_BLEED v5_buck 0 {r3}
+C_BUCK v5_buck 0 44u
+D_USB_FWD usb_vbus usb_post D_1N5819
+M_QUSB usb_post q_usb_g vin_3v3 vin_3v3 PMOS_AO3401 W=1 L=1
+D_QUSB_BD usb_post vin_3v3 D_BODY
+R27 v5_buck q_usb_g {r27}
+D_OR_PED v5_buck vin_3v3 D_1N5819
+C_LDO vin_3v3 0 10u
+R_LDO_LOAD vin_3v3 0 94
+B_3V3 v3v3_dig 0 V = 3.30 * (0.5 + 0.5 * tanh(20 * (v(vin_3v3) - 4.2)))
+R77 v5_buck dac0_cs {r_cs_pu}
+R78 v5_buck dac1_cs {r_cs_pu}
+R79 v5_buck dac2_cs {r_cs_pu}
+R80 v5_buck dac3_cs {r_cs_pu}
+D_ESD0 dac0_cs v5_buck D_ESD
+D_ESD1 dac1_cs v5_buck D_ESD
+D_ESD2 dac2_cs v5_buck D_ESD
+D_ESD3 dac3_cs v5_buck D_ESD
+R_LVL_IN v3v3_dig 0 16Meg
+.tran 20u 15m uic
+.control
+run
+meas tran v_buck_pk MAX v(v5_buck) FROM=0m TO=15m
+meas tran v_buck_ss AVG v(v5_buck) FROM=10m TO=15m
+meas tran v_3v3_ss  AVG v(v3v3_dig) FROM=10m TO=15m
+quit
+.endc
+.end
+"""
+    m_tran = run_ngspice("t2_usb_only_tran", tran_deck)
+    assert m_tran["v_buck_pk"] < 0.10 and m_tran["v_buck_ss"] < 0.05, f"USB-only transient latch-up on +5V_BUCK: {m_tran}"
+    assert m_tran["v_3v3_ss"] >= 3.25, f"USB-only transient +3V3_DIG failed: {m_tran}"
     print(
-        f"[PASS] Test 2 (Bidirectional USB Isolation): "
+        f"[PASS] Test 2 (Bidirectional USB Isolation + 3.3V/ESD Transient Zero Latch-Up): "
         f"Pedal->USB={abs(m_ped['i_usb'])*1e9:.2f}nA (Vldo={m_ped['v_ldo']:.3f}V) | "
         f"Both->Iusb={abs(m_both['i_usb'])*1e9:.2f}nA | "
-        f"USB->5V_BUCK={abs(m_usb['i_buck'])*1e9:.2f}nA (Vldo={m_usb['v_ldo']:.3f}V)"
+        f"USB->5V_BUCK={abs(m_usb['i_buck'])*1e9:.1f}nA (Vbuck_pk={m_tran['v_buck_pk']*1e3:.2f}mV, Vbuck_ss={m_tran['v_buck_ss']*1e3:.2f}mV)"
     )
 
 
@@ -390,8 +479,8 @@ def test_6_mcp6002_adc_clamp(vals: dict[str, str]) -> None:
     r_adc = parse_value_ohms(vals["R75"])
     c_adc = parse_cap_farads(vals["C42"])
 
-    def sim_env(tag: str, vpk_in: float) -> dict[str, float]:
-        deck = f"""* Beads Test 6: +3.3V MCP6002 Peak Detector & Fault Clamp ({tag}, Vpk={vpk_in}V)
+    def sim_env(tag: str, vpk_l: float, vpk_r: float) -> dict[str, float]:
+        deck = f"""* Beads Test 6: +3.3V MCP6002 Peak Detector & Fault Clamp ({tag}, L={vpk_l}Vpk, R={vpk_r}Vpk)
 .model D_SIG D(IS=2.5e-9 N=1.75 RS=0.5)
 .subckt MCP6002_3V3 inp inn out
 * Smooth physical MCP6002 (1MHz GBW, 0.00V..3.30V rail-to-rail single supply, Rout=100 Ohm)
@@ -402,8 +491,8 @@ E_BUF n3 0 n2 0 1.0
 R_OUT n3 out 100
 .ends
 V_VDD vdd 0 DC 3.30
-V_SIGL send_l 0 SIN(0 {vpk_in} 440)
-V_SIGR send_r 0 SIN(0 {vpk_in} 440)
+V_SIGL send_l 0 SIN(0 {vpk_l} 440)
+V_SIGR send_r 0 SIN(0 {vpk_r} 440)
 R_SL send_l env_sum {r_sl}
 R_SR send_r env_sum {r_sr}
 R_DIV env_sum 0 {r_div}
@@ -433,60 +522,86 @@ quit
 """
         return run_ngspice(f"t6_{tag}", deck)
 
-    m_norm = sim_env("normal_4vpk", 4.0)
-    m_fault = sim_env("fault_12vpk", 12.0)
-    assert 1.5 <= m_norm["v_adc_max"] <= 3.1, f"Normal 4Vpk guitar envelope out of range: {m_norm}"
+    m_mono = sim_env("mono_4vpk", 4.0, 0.0)
+    m_stereo = sim_env("stereo_4vpk", 4.0, 4.0)
+    m_fault = sim_env("fault_12vpk", 12.0, 12.0)
+    assert 2.15 <= m_mono["v_adc_max"] <= 3.10, f"Mono 4Vpk on SEND_L failed to trip 2.10V PEAK threshold: {m_mono}"
+    assert 2.15 <= m_stereo["v_adc_max"] <= 3.15, f"Stereo 4Vpk guitar envelope out of range: {m_stereo}"
     assert m_fault["v_adc_max"] <= 3.301, f"Fault 12Vpk exceeded +3.30V RP2040 ADC limit: {m_fault}"
     assert m_fault["v_adc_min"] >= -0.01, f"Fault 12Vpk went negative on RP2040 ADC: {m_fault}"
     print(
         f"[PASS] Test 6 (+3.3V MCP6002 Peak Detector & ADC Clamp): "
-        f"Normal4Vpk->ADC={m_norm['v_adc_max']:.3f}V | "
+        f"Mono4Vpk->ADC={m_mono['v_adc_max']:.3f}V (>2.10V) | "
+        f"Stereo4Vpk->ADC={m_stereo['v_adc_max']:.3f}V | "
         f"Fault12Vpk->ADC=[{m_fault['v_adc_min']:.3f}V, {m_fault['v_adc_max']:.3f}V] (<=3.30V)"
     )
 
 
-def test_7_regulator_setpoints_and_esr(vals: dict[str, str]) -> None:
-    # Verify netlist feedback dividers for TPS5430 (+5.08V), TPS65131 (+13.9V/-13.7V), LM317 (+12.0V), and 79M12 ESR damping!
+def test_7_regulator_setpoints_and_esr(vals: dict[str, str], pin_nets: dict[tuple[str, str], str]) -> None:
+    # Verify netlist feedback dividers for TPS5430 (+5.08V), TPS65131 (+14.65V/-14.56V, PSP/PSN=GND, I_VREF<=10uA),
+    # LM317 (+12.0V), 79M12 ESR damping, VBUS_DET <= 3.30V @ 5.25V, and CJ431 capacitive isolation!
     r_buck_top = parse_value_ohms(vals["R4"]) + parse_value_ohms(vals["R5"]) + parse_value_ohms(vals["R6"])
     r_buck_bot = parse_value_ohms(vals["R7"])
     v_buck = 1.221 * (1.0 + r_buck_top / r_buck_bot)
     assert 4.95 <= v_buck <= 5.18, f"TPS5430 Vout {v_buck:.3f}V out of +5.05V +-2%"
 
+    # TI SLVS493E: PSP (Pin 9) & PSN (Pin 11) MUST tie to GND (0V = fixed-frequency PWM)
+    assert pin_nets[("U_PMIC", "9")] == "GND", f"U_PMIC.9 (PSP) must tie to GND, got {pin_nets[('U_PMIC', '9')]}"
+    assert pin_nets[("U_PMIC", "11")] == "GND", f"U_PMIC.11 (PSN) must tie to GND, got {pin_nets[('U_PMIC', '11')]}"
+
     r_fbp_top = parse_value_ohms(vals["R12"]) + parse_value_ohms(vals["R13"])
     r_fbp_bot = parse_value_ohms(vals["R14"])
     v_pos_raw = 1.213 * (1.0 + r_fbp_top / r_fbp_bot)
-    assert 13.6 <= v_pos_raw <= 14.2, f"TPS65131 +Vraw {v_pos_raw:.3f}V out of range"
+    assert 14.35 <= v_pos_raw <= 14.95, f"TPS65131 +Vraw {v_pos_raw:.3f}V out of +14.65V headroom window"
 
     r_fbn_top = parse_value_ohms(vals["R15"]) + parse_value_ohms(vals["R16"])
     r_fbn_bot = parse_value_ohms(vals["R17"])
+    i_vref_ua = 1.213 / r_fbn_bot * 1e6
+    assert r_fbn_bot >= 120e3 and i_vref_ua <= 10.0, f"TPS65131 VREF load {i_vref_ua:.2f} uA > 10 uA max (R17={r_fbn_bot})"
     v_neg_raw = -1.213 * (r_fbn_top / r_fbn_bot)
-    assert -14.1 <= v_neg_raw <= -13.4, f"TPS65131 -Vraw {v_neg_raw:.3f}V out of range"
+    assert -14.95 <= v_neg_raw <= -14.25, f"TPS65131 -Vraw {v_neg_raw:.3f}V out of -14.55V headroom window"
 
     r_lm1 = parse_value_ohms(vals["R18"])
     r_lm2 = parse_value_ohms(vals["R19"]) + parse_value_ohms(vals["R20"])
     v_p12 = 1.25 * (1.0 + r_lm2 / r_lm1) + 50e-6 * r_lm2
     assert 11.80 <= v_p12 <= 12.20, f"LM317 +12V_EUR {v_p12:.3f}V out of +-2%"
+    assert (v_pos_raw - v_p12) >= 2.20, f"LM317 dropout headroom {v_pos_raw - v_p12:.2f}V < 2.20V"
+    assert (abs(v_neg_raw) - 12.00) >= 2.20, f"79M12 dropout headroom {abs(v_neg_raw) - 12.0:.2f}V < 2.20V"
+
+    # VBUS_DET divider <= 3.30V at 5.25V USB max & >= 2.50V at 4.50V USB min
+    r25 = parse_value_ohms(vals["R25"])
+    r26 = parse_value_ohms(vals["R26"])
+    vbus_det_max = 5.25 * r26 / (r25 + r26)
+    vbus_det_min = 4.50 * r26 / (r25 + r26)
+    assert vbus_det_max <= 3.30 and vbus_det_min >= 2.50, f"VBUS_DET range [{vbus_det_min:.3f}V, {vbus_det_max:.3f}V] out of spec"
+
+    # CJ431 (U_REF) stability: C52 must NOT sit directly on VREF_RAW; isolated via R143 >= 200R
+    assert pin_nets[("U_REF", "2")] == "VREF_RAW"
+    assert pin_nets[("C52", "1")] == "VREF_FILT" and pin_nets[("C52", "1")] != pin_nets[("U_REF", "2")]
+    r_iso = parse_value_ohms(vals["R143"])
+    assert r_iso >= 200.0, f"CJ431 filter isolation resistor R143={r_iso} Ohm < 200 Ohm"
 
     r_esr = parse_value_ohms(vals["R_ESR_N12"])
     c_n12_bulk = parse_cap_farads(vals["C20"])
     c_n12_hf = parse_cap_farads(vals["C21"])
     assert 0.2 <= r_esr <= 1.0 and c_n12_bulk >= 9.9e-6 and c_n12_hf >= 0.99e-6, "79M12 ESR damping network invalid"
     print(
-        f"[PASS] Test 7 (Netlist Power Setpoints & 79M12 ESR): "
-        f"+5V_BUCK={v_buck:.3f}V | +Vraw={v_pos_raw:.2f}V | -Vraw={v_neg_raw:.2f}V | "
-        f"+12V_EUR={v_p12:.3f}V | 79M12 ESR={r_esr:.2f}R + {c_n12_bulk*1e6:.0f}uF || {c_n12_hf*1e6:.0f}uF"
+        f"[PASS] Test 7 (Netlist Power Setpoints, PSP/PSN=GND, VREF, VBUS_DET & CJ431): "
+        f"+5V_BUCK={v_buck:.3f}V | +Vraw={v_pos_raw:+.2f}V | -Vraw={v_neg_raw:+.2f}V (Ivref={i_vref_ua:.2f}uA) | "
+        f"VBUS_DET@5.25V={vbus_det_max:.3f}V | CJ431_Riso={r_iso:.0f}R | 79M12 ESR={r_esr:.2f}R"
     )
 
 
 def main() -> int:
     vals = load_netlist_values()
+    pin_nets = load_netlist_pin_nets()
     test_1_rpp_and_gate_clamp(vals)
-    test_2_usb_isolation(vals)
+    test_2_usb_isolation(vals, pin_nets)
     test_3_photomos_popless_bypass(vals)
     test_4_stereo_guitar_unity(vals)
     test_5_bipolar_cv_dac(vals)
     test_6_mcp6002_adc_clamp(vals)
-    test_7_regulator_setpoints_and_esr(vals)
+    test_7_regulator_setpoints_and_esr(vals, pin_nets)
     print("ALL 7 NGSPICE ANALOG, POWER, USB-ISOLATION & POPLESS-BYPASS GATES PASSED!")
     return 0
 

@@ -49,12 +49,12 @@ void beads_core1_service_slice(uint32_t now_ms) {
     last_non_rt = g_midi.last_non_rt_ms;
     hal_crit_exit();
 
-    oled_ui_handle_inputs(&g_ui, enc_d, enc_c, back_c, &g_engine, &g_presets);
+    oled_ui_handle_inputs(&g_ui, enc_d, enc_c, back_c, &g_engine, &g_bypass, &g_midi, &g_presets);
 
     /* 3. Render (under lock snapshot) & flush 1 page slice of SSD1306 (bounded I2C timeout) */
     bool vbus = hal_gpio_read(PIN_VBUS_DET);
     hal_crit_enter();
-    oled_ui_render(&g_ui, &g_engine, &g_bypass, vbus);
+    oled_ui_render(&g_ui, &g_engine, &g_bypass, &g_presets, vbus);
     hal_crit_exit();
     (void)oled_ui_flush_one_page(&g_ui);
 

@@ -39,9 +39,9 @@
         {"ref": "MH101", "x": 10.0, "y": 41.0, "drill_mm": 3.2},
         {"ref": "MH102", "x": 76.0, "y": 41.0, "drill_mm": 3.2},
         {"ref": "MH103", "x": 142.0, "y": 41.0, "drill_mm": 3.2},
-        {"ref": "MH104", "x": 10.0, "y": 152.0, "drill_mm": 3.2},
-        {"ref": "MH105", "x": 76.0, "y": 152.0, "drill_mm": 3.2},
-        {"ref": "MH106", "x": 142.0, "y": 152.0, "drill_mm": 3.2}
+        {"ref": "MH104", "x": 10.0, "y": 142.0, "drill_mm": 3.2},
+        {"ref": "MH105", "x": 76.0, "y": 142.0, "drill_mm": 3.2},
+        {"ref": "MH106", "x": 142.0, "y": 142.0, "drill_mm": 3.2}
       ],
       "north_wall_connectors_world_mm": {
         "J_OUT_R":     {"mpn": "NMJ4HCD2",       "x_center": 15.5,  "z_center": -30.26, "bore_dia": 11.5, "spotface_dia": 16.5},
@@ -49,9 +49,9 @@
         "J_IN_R":      {"mpn": "NMJ4HCD2",       "x_center": 55.5,  "z_center": -30.26, "bore_dia": 11.5, "spotface_dia": 16.5},
         "J_IN_L":      {"mpn": "NMJ4HCD2",       "x_center": 75.5,  "z_center": -30.26, "bore_dia": 11.5, "spotface_dia": 16.5},
         "J_MIDI_THRU": {"mpn": "SJ1-3523N",      "x_center": 93.0,  "z_center": -35.90, "bore_dia": 6.4},
-        "SW_MIDI_AB":  {"mpn": "JS202011AQN",    "x_center": 105.0, "z_center": -36.50, "window_wh": [5.4, 3.0]},
+        "SW_MIDI_AB":  {"mpn": "JS202011AQN",    "x_center": 105.0, "z_center": -36.50, "window_wh": [5.4, 3.0], "alcove_wh": [11.6, 6.8], "alcove_y_floor": 182.3},
         "J_MIDI_IN":   {"mpn": "SJ1-3523N",      "x_center": 117.0, "z_center": -35.90, "bore_dia": 6.4},
-        "J_USB":       {"mpn": "TYPE-C-31-M-12", "x_center": 129.5, "z_center": -36.80, "oval_wh": [9.4, 3.6]},
+        "J_USB":       {"mpn": "TYPE-C-31-M-12", "x_center": 129.5, "z_center": -36.80, "oval_wh": [9.4, 3.6], "pocket_wh": [13.0, 7.5], "pocket_y_floor": 183.2},
         "DC_JACK":     {"mpn": "Tensility_54-00401", "x_center": 140.4, "z_center": -28.00, "d_bore_dia": 11.1, "d_flat_mm": 10.0, "panel_mount": true}
       }
     },

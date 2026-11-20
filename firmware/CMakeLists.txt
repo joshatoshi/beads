@@ -11,6 +11,7 @@ set(BEADS_CORE_SRCS
     src/presets.c
     src/cv_engine.c
     src/oled_ui.c
+    src/usb_ep0.c
     src/main.c
 )
 
@@ -18,7 +19,9 @@ if(DEFINED ENV{PICO_SDK_PATH} AND EXISTS "$ENV{PICO_SDK_PATH}/external/pico_sdk_
     set(PICO_BOARD pico)
     include("$ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake")
     pico_sdk_init()
-    add_executable(beads_bridge ${BEADS_CORE_SRCS} target/rp2040_hal.c)
+    # Use Pico SDK HAL adapter (target/pico_sdk_hal.c) rather than bare-metal target/rp2040_hal.c
+    # so SDK clocks, multicore FIFO, IRQ vectors, and flash lockout never collide.
+    add_executable(beads_bridge ${BEADS_CORE_SRCS} target/pico_sdk_hal.c)
     target_include_directories(beads_bridge PRIVATE include)
     target_compile_definitions(beads_bridge PRIVATE PICO_CORE1_STACK_SIZE=0x1000)
     target_compile_options(beads_bridge PRIVATE -Wall -Wextra -Werror -fstack-usage)

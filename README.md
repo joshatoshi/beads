@@ -22,8 +22,8 @@ A complete, fabrication-ready **low-profile guitar pedalboard skiff (`152.0 × 1
 
 1. **Multi-Stage Protected `9V–18V DC` Center-Negative → Ultra-Quiet `±12.0V` Eurorack Power (`plan/01`):**
    - Standard **`2.1 × 5.5 mm` Center-Negative** input (`Outer Sleeve = +9..18V`, `Center Pin = 0V GND`) via an all-insulated LCP panel DC jack (**Tensility `54-00401`**) into a **`33V 1.1A` resettable PTC (`SMD1812B110TF/33`, `C269134`)**, **`600W` bidirectional TVS (`SMBJ20CA`, `C19077576`)**, **`AO3401A` reverse-polarity P-MOSFET** with **`18V`-safe `9.1V` Zener gate clamp (`BZX84-C9V1`)**, and input LC Pi-filter (`BLM18PG121SN1D` `2A` ferrite).
-   - **`TPS5430DDAR` (`+5.08V @ 500 kHz`)** → **`TPS65131RGER` (`+13.9V / -13.7V @ 1.38 MHz`)** → linear **`LM317AG-TN3-R` (`+12.0V_EUR`)** & ESR-damped **`79M12(TP)` (`-12.0V_EUR`)** post-regulators + `2A` ferrite LC filters feeding the shrouded **`2×5` Eurorack IDC box header (`J_EURO_PWR`)** marked **`RED STRIPE / -12V (PINS 1-2)`**.
-   - **`< 1 µA` Bidirectional `USB-C VBUS` ↔ `+5V_BUCK` Isolation:** Safe simultaneous `USB-C` laptop/iPad connection + pedalboard DC power (`0.01 nA` measured backfeed in `ngspice`), plus bench-only `USB-C` UF2 flashing & preset editing with `9–18V` unplugged.
+   - **`TPS5430DDAR` (`+5.08V @ 500 kHz`)** → **`TPS65131RGER` (`+14.65V / -14.56V @ 1.38 MHz` fixed-PWM, `PSP/PSN=GND`)** → linear **`LM317AG-TN3-R` (`+12.0V_EUR`)** & ESR-damped **`79M12(TP)` (`-12.0V_EUR`)** post-regulators + `2A` ferrite LC filters feeding the shrouded **`2×5` Eurorack IDC box header (`J_EURO_PWR`)** marked **`RED STRIPE / -12V (PINS 1-2)`**.
+   - **`< 1 µA` Bidirectional `USB-C VBUS` ↔ `+5V_BUCK` Isolation & `3.3V → 5V` Level Shifting:** `D_OR_PED` (`1N5819WS`) + `I_off`-isolated **`SN74AHCT541PWR`** (`C50989`) SPI/CS level shifter with `+5V_BUCK` pull-ups (`R77..R80`), ensuring `MCP4822` `V_IH >= 3.56V` compliance and `< 0.5 µA` zero-backfeed isolation during simultaneous `USB-C` + pedal DC or USB-only UF2 bench flashing.
 
 2. **Stereo `1/4"` Guitar ↔ Eurorack Gain Staging & Boutique Popless PhotoMOS True Bypass (`plan/02`):**
    - `4×` North-edge PCB-mounted **Neutrik `NMJ4HCD2`** `1/4"` jacks (`OUT R`, `OUT L/Mono`, `IN R` passively normalled from `IN L/Mono` via `TN`; output `TN` pins strictly isolated — **zero flying audio wires!**).
@@ -37,9 +37,9 @@ A complete, fabrication-ready **low-profile guitar pedalboard skiff (`152.0 × 1
    - Per-channel **Autonomous `C¹` Cubic Bezier Random Drift**, free/clock-synced **256-pt LFOs** (`Sine`, `Tri`, `Ramp Up/Down` for `TIME` scrubbing, `Square`, `Slewed S&H`), **Euclidean `(Steps, Hits)` Triggers**, **9-Octave LUT-Calibrated `1V/Oct` Pitch CV**, **MIDI Gate/Trig/Clock-Div/CC**, **Guitar Envelope/Pluck**, and **FS2 `FREEZE` / `SEED` Tap-Tempo** — viewed on a **`0.96"` `128×64` `SSD1306` OLED oscilloscope** and stored in **dual-slot A/B `CRC32` + `write_seq` QSPI Flash (`32` presets)**.
 
 4. **Cost-Optimized 3-Board 2-Layer JLCPCB Partitioning & Bambu Lab X2D `PETG-HF` Stepped Enclosure (`plan/03`, `plan/04`):**
-   - **`main_board` (`142.0 × 146.6 mm`, 2-layer `1.6 mm` FR4):** Single-sided Top-Side JLCPCB SMT PCBA (`77` unique verified LCSC parts: **`55` Basic, `7` Preferred, `15` Extended**, `303` SMD placements, `0` THT in CPL, **`89.22%` continuous unbroken `B.Cu` ground plane**, `196` nets, `ERC = 0`, `DRC = 0`, `unconnected = 0`).
-   - **`ui_mezzanine` (`68.0 × 108.0 mm`, 2-layer `1.6 mm` FR4, `$0` PCBA fee):** Pure user-hand-soldered THT carrier (`12×` Thonkiconn, `SSD1306` w/ reversible `JP_OLED_PWR`, `EC11`, `BACK`, `2×` dual-gang `10 kΩ` trim pots, `PEAK` LED, `0.0000 mm` XY-matched `2×8` BTB sockets).
-   - **`faceplate_14hp` (`70.80 × 128.50 mm`, 2-layer `1.6 mm` Matte-Black FR4, `$0` PCBA fee):** Sits on the `-1.60 mm` Left 3U rail shelf alongside Mutable Instruments Beads on the `-2.00 mm` Right 3U rail shelf — **both panels dead-flush at `Z = 0.00 mm`** above a `-12.00 mm` stepped front stomp apron (`92.0 mm` footswitch spacing) reinforced by `4×` full-height internal stomp pillars and `18×` `M3` brass heat-set inserts (**`0.000 mm³` pairwise `OCP BRepAlgoAPI_Common` collision across all `112` un-grouped solids**).
+   - **`main_board` (`142.0 × 146.6 mm`, 2-layer `1.6 mm` FR4):** Single-sided Top-Side JLCPCB SMT PCBA (`77` unique verified LCSC parts: **`54` Basic, `7` Preferred, `16` Extended**, `304` SMD placements, `0` THT in CPL, **`92.58%` single largest connected `B.Cu` ground island** with `0` un-stitched islands, `202` nets, `ERC = 0/0`, `DRC = 0` errors / `0` warnings, `unconnected = 0`).
+   - **`ui_mezzanine` (`68.0 × 108.0 mm`, 2-layer `1.6 mm` FR4, `$0` PCBA fee):** Pure user-hand-soldered THT carrier (`12×` Thonkiconn, `SSD1306` w/ reversible `JP_OLED_PWR` & `8.13 mm <= 8.50 mm` low-profile `DW-04-07-T-S-200` stack, `EC11E15244G1` 15 PPR bushingless, `BACK`, `2×` vertical dual-gang `10 kΩ` trim pots `Alpha RD902F-40-15R1-B10K-00D`, `PEAK` LED, `B.Cu`-mounted `0.0000 mm` XY-matched `2×8` BTB sockets).
+   - **`faceplate_14hp` (`70.80 × 128.50 mm`, 2-layer `1.6 mm` Matte-Black FR4, `$0` PCBA fee):** Sits on the `-1.60 mm` Left 3U rail shelf alongside Mutable Instruments Beads on the `-2.00 mm` Right 3U rail shelf — **both panels dead-flush at `Z = 0.00 mm`** above a `-12.00 mm` stepped front stomp apron (`92.0 mm` footswitch spacing) reinforced by `4×` full-height internal stomp pillars and `18×` `M3` brass heat-set inserts (**`0.000 mm³` pairwise `OCP BRepAlgoAPI_Common` collision across all `121` un-grouped solids + `0.000 mm³` rigid-body insertion sweep**).
 
 ---
 
@@ -67,11 +67,11 @@ A complete, fabrication-ready **low-profile guitar pedalboard skiff (`152.0 × 1
 │   ├── Makefile & CMakeLists.txt     # Bare-metal ARM UF2 build + Pico SDK CMake + Host unit tests
 │   ├── include/ & src/               # Dual-core RP2040 C11 engine, Bezier/LFO/1V-Oct, OLED, Presets
 │   ├── target/                       # RP2040 XIP boot2, linker script & silicon register HAL
-│   ├── tests/test_beads_firmware.c   # 7 deterministic host silicon-mock assert() test suites
+│   ├── tests/test_beads_firmware.c   # 9 deterministic host silicon-mock assert() test suites
 │   └── build/beads_bridge.uf2        # Ready-to-flash RP2040 UF2 firmware image (0xE48BFF56)
 ├── cad/
 │   ├── build_enclosure.py            # Parametric Build123d enclosure, assembly & studio renderer
-│   ├── verify_3d_collisions.py       # 112-solid pairwise OCP BRepAlgoAPI_Common 0.000 mm³ gate
+│   ├── verify_3d_collisions.py       # 121-solid pairwise + kinematic OCP BRepAlgoAPI_Common 0.000 mm³ gate
 │   └── exports/                      # Print-ready STLs, STEPs, Studio PNGs & Wiring Diagram
 └── scripts/
     ├── generate_3d_shapes.py         # Deterministic STEP builder for hardware/beads_custom.3dshapes
@@ -90,7 +90,7 @@ A complete, fabrication-ready **low-profile guitar pedalboard skiff (`152.0 × 1
    - Plug a `USB-C` cable from your computer into the North-wall `USB-C` port (with or without `9–18V` pedal power connected — `< 1 µA` isolated!).
    - A fresh `RP2040` automatically enumerates as **`RPI-RP2`** USB Mass Storage. Copy `firmware/build/beads_bridge.uf2` directly onto the `RPI-RP2` drive.
 2. **In-Case Field Updates (No Disassembly Needed):**
-   - **Via Front-Panel OLED:** Press `BACK` from the Scope view to enter **`SYSTEM MENU`**, scroll to **`USB FIRMWARE UPD`**, and click the encoder — the skiff reboots immediately into `RPI-RP2` UF2 mode.
+   - **Via Front-Panel OLED:** Press `BACK` from the Scope view to enter **`SYSTEM MENU`**, scroll to **`USB FW UPDATE`**, and click the encoder — the skiff reboots immediately into `RPI-RP2` UF2 mode.
    - **Via `1200-baud` USB-CDC Touch:** Run `picotool load -f firmware/build/beads_bridge.uf2` (or open/close the virtual serial port at `1200 bps`).
    - **Hardware Fallback:** Hold onboard SMD **`BOOTSEL` (`SW_BOOT`)** while plugging in `USB-C`.
 
@@ -114,8 +114,8 @@ bash scripts/run_all_checks.sh
 ```
 
 `scripts/run_all_checks.sh` executes all 5 mandatory engineering gates from scratch and exits `0`:
-1. **Gate 1 (`scripts/verify_pcb_gates.py`):** KiCad 9 `ERC = 0/0`, `DRC = 0` errors, `unconnected = 0` across all 3 boards, `${KIPRJMOD}` portability, `89.22%` `B.Cu` GND pour (`>= 88%`), `0.0000 mm` `J_BTB_*` XY congruence, segmented `F.Paste` (`0` via-in-paste), and `3.31 mm` `MH*` non-GND keepout.
+1. **Gate 1 (`scripts/verify_pcb_gates.py`):** KiCad 9 `ERC = 0/0`, `DRC = 0` errors / `0` warnings, `unconnected = 0` across all 3 boards, `${KIPRJMOD}` portability, `92.58%` single largest connected `B.Cu` GND island (`>= 88%`, `0` un-stitched islands), `>= 0.50 mm` bulk power trunks, `F.Cu↔B.Cu` `0.0000 mm` `J_BTB_*` XY congruence, segmented `F.Paste` (`0` via-in-paste), and `3.32 mm` `MH*` non-GND keepout.
 2. **Gate 2 (`scripts/export_manufacturing.py`):** Exports Gerbers, PTH/NPTH drills, schematic PDFs, BOMs, and EasyEDA Pin-1/centroid-verified CPL (`100%` matched against `jlcpcb_parts.db`, `0` zero-stock, `0` THT in CPL).
-3. **Gate 3 (`hardware/spice/verify_analog.py`):** Netlist-derived `ngspice` batch verification of `9–18V` RPP + `9.1V` gate clamp, `< 1 µA` bidirectional USB isolation, `> 45 dB` `TLP172AM` popless mute (`< 2 mV` bounce spike), `0.0 dB` `12-o'clock` stereo unity & `0°` phase, `±8.16V` CV span, and `<= 3.30V` `MCP6002` ADC clamp.
-4. **Gate 4 (`firmware/Makefile`):** `arm-none-eabi-gcc -Wall -Wextra -Werror -fstack-usage` producing `firmware/build/beads_bridge.uf2` (`0xE48BFF56`), `0` 64-bit/float helpers, `160 B` max stack frame, and `7/7` host silicon-mock `assert()` test suites.
-5. **Gate 5 (`cad/verify_3d_collisions.py`):** `Build123d` + `OCP BRepAlgoAPI_Common` **`0.000000 mm³` pairwise intersection** across all `112` un-grouped solids (`6,216` pairs) and `+8.40 mm` (`>= 8.00 mm`) shaft protrusion.
+3. **Gate 3 (`hardware/spice/verify_analog.py`):** Netlist-derived `ngspice` batch verification of `9–18V` RPP + `9.1V` gate clamp, `< 1 µA` bidirectional USB isolation + USB-only `+3V3_DIG`/ESD hot-plug latch test, `> 45 dB` `TLP172AM` popless mute (`< 2 mV` bounce spike), `0.0 dB` `12-o'clock` stereo unity & `0°` phase, `±8.16V` CV span (`CJ431` `R143` stabilized), and `<= 3.30V` `MCP6002` mono/stereo ADC clamp.
+4. **Gate 4 (`firmware/Makefile`):** `arm-none-eabi-gcc -Wall -Wextra -Werror -fstack-usage` producing `firmware/build/beads_bridge.uf2` (`0xE48BFF56`), `0` 64-bit/float/soft-div helpers in Core 0 RT, `160 B` max stack frame, and `9/9` host silicon-mock `assert()` test suites (including multi-packet 146 B USB EP0 descriptors & `EC11E` 2-edge quadrature).
+5. **Gate 5 (`cad/verify_3d_collisions.py`):** `Build123d` + `OCP BRepAlgoAPI_Common` **`0.000000 mm³` pairwise intersection** across all `121` un-grouped solids (`7,260` pairs), **`0.000000 mm³` rigid-body `main_board` insertion sweep** (`13` poses × `25` soldered parts), `0.35 mm` (`<= 0.50 mm`) `J_USB` reach (`2.69 mm` North-wall web), `8.13 mm` (`<= 8.50 mm`) `SSD1306` stack, and `+8.40 mm` / `+13.40 mm` (`>= 8.00 mm`) shaft protrusions.

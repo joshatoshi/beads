@@ -43,7 +43,8 @@ static const uint32_t RATE_INC_Q32_2KHZ[128] = {
      27190746u,  29025773u,  30984642u,  33075708u,  35307895u,  37690726u,  40234368u,  42949673u,
 };
 
-/* Full 16-state Gray-code quadrature transition table (Alps EC11E, 4 edges/detent) */
+/* Full 16-state Gray-code quadrature transition table
+ * (Alps EC11E15244G1: 30 detents / 15 PPR = 2 quadrature edges per detent) */
 static const int8_t ENC_QUAD_LUT[16] = {
      0, -1, +1,  0,
     +1,  0,  0, -1,
@@ -76,11 +77,12 @@ int8_t cv_engine_decode_encoder_step(uint8_t *prev_ab, int8_t *sub_steps, uint8_
         return 0;
     }
     *sub_steps = (int8_t)(*sub_steps + d);
-    if (*sub_steps >= 4) {
+    /* Alps EC11E15244G1 (15 PPR / 30 detents): 2 quadrature edges per detent click */
+    if (*sub_steps >= 2) {
         *sub_steps = 0;
         return +1;
     }
-    if (*sub_steps <= -4) {
+    if (*sub_steps <= -2) {
         *sub_steps = 0;
         return -1;
     }
@@ -376,7 +378,9 @@ void cv_engine_tick_2khz(cv_engine_t *eng, bypass_seq_t *byp, dac_bank_t *dacs,
     bool fs1_raw  = !hal_gpio_read(PIN_FS1_BYPASS_SW);
     bypass_seq_tick_2khz(byp, pwr_good, fs1_raw);
 
-    /* Enable MCP4822 DAC bank only once analog +5V/+-12V rails clear POR */
+    /* Keep SPI0 & ~CS GPIOs strictly LOW when +5V_BUCK is off (USB-only / brownout defense-in-depth),
+     * and enable MCP4822 DAC bank only once analog +5V/+-12V rails clear POR */
+    hal_spi_dac_set_power_safe(pwr_good);
     dac_bank_set_enabled(dacs, pwr_good && byp->por_cleared_once);
 
     /* 3. Drain UART0 + USB-MIDI rings */
@@ -399,16 +403,26 @@ void cv_engine_tick_2khz(cv_engine_t *eng, bypass_seq_t *byp, dac_bank_t *dacs,
     update_ui_buttons_and_fs2(eng, now_us);
     update_guitar_envelope(eng);
 
-    /* Master 16th-note clock pulse: uses external 24 PPQN MIDI clock (/6) when active (<500ms),
-     * falling back cleanly to internal FS2 Tap-Tempo clock ONLY when external MIDI clock is absent! */
+    /* Master 16th-note clock pulse: uses external 24 PPQN MIDI clock (/6 via wrap counter, zero div!)
+     * when active (<500ms), falling back cleanly to internal FS2 Tap-Tempo clock ONLY when absent! */
     bool ext_clk_active = (midi->last_clock_us != 0u) && ((uint32_t)(now_us - midi->last_clock_us) < 500000u);
     eng->master_clk_pulse = false;
     if (ext_clk_active) {
         eng->internal_clk_acc_us = 0u;
-        if (midi->clock_pulse && ((midi->clock_tick_count % 6u) == 1u)) {
-            eng->master_clk_pulse = true;
+        if (midi->clock_pulse) {
+            if (midi->clock_tick_count == 1u) {
+                eng->ext_clk_div6_cnt = 0u;
+            }
+            if (eng->ext_clk_div6_cnt == 0u) {
+                eng->master_clk_pulse = true;
+            }
+            eng->ext_clk_div6_cnt++;
+            if (eng->ext_clk_div6_cnt >= 6u) {
+                eng->ext_clk_div6_cnt = 0u;
+            }
         }
     } else {
+        eng->ext_clk_div6_cnt = 0u;
         eng->internal_clk_acc_us += dt_us;
         uint32_t step_us = eng->tap_period_us >> 2u; /* 16th-note pulse */
         if (step_us < 20000u) step_us = 20000u;
@@ -546,6 +560,11 @@ void cv_engine_tick_2khz(cv_engine_t *eng, bypass_seq_t *byp, dac_bank_t *dacs,
                 scope_q15 = high ? 32767 : 0;
                 break;
             }
+        }
+
+        if (eng->cal_override_active && i == eng->cal_override_ch) {
+            out_code = eng->cal_override_code & 0x0FFFu;
+            scope_q15 = ((int32_t)out_code - DAC_CODE_ZERO_V) << 4;
         }
 
         rt->last_out_code = out_code;

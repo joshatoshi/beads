@@ -15,6 +15,8 @@ bool     hal_gpio_read(uint32_t pin);
 
 /* SPI0 16-bit MCP4822 write with dedicated chip-select index 0..3 */
 void     hal_spi_dac_write16(uint8_t dac_idx, uint16_t word);
+/* Power-safe SPI0/CS drive: LOW when +5V_BUCK is off (USB-only), SPI0+CS HIGH when on */
+void     hal_spi_dac_set_power_safe(bool pedal_pwr_good);
 
 /* SAR ADC read (MUST discard 1 dummy conversion after every mux channel switch!) */
 uint16_t hal_adc_read_ch(uint8_t adc_ch);

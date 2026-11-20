@@ -93,6 +93,7 @@ def add_gnd_zone(board: pcbnew.BOARD, w: float, h: float, layer: int = pcbnew.B_
     z.SetThermalReliefGap(mm(0.30))
     z.SetThermalReliefSpokeWidth(mm(0.35))
     z.SetPadConnection(pcbnew.ZONE_CONNECTION_THERMAL)
+    z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
     outline = z.Outline()
     outline.NewOutline()
     for x, y in [
@@ -151,25 +152,25 @@ def configure_2layer_rules(board: pcbnew.BOARD, min_track: float = 0.15, min_cle
     ds.m_ViasMinSize = mm(0.50)
     ds.m_ViasMinDrill = mm(0.30)
     ds.m_CopperEdgeClearance = mm(0.35)
-    ds.m_HoleClearance = mm(0.35)
-    ds.m_HoleToHoleMin = mm(0.45)
+    ds.m_HoleClearance = mm(0.25)
+    ds.m_HoleToHoleMin = mm(0.35)
     ds.m_SilkClearance = mm(0.10)
     ds.m_MinSilkTextHeight = mm(0.80)
     ds.m_MinSilkTextThickness = mm(0.12)
-    # Default netclass (KiCad 9 API)
+    # Default netclass (KiCad 9 API) — 0.55/0.30mm via gives 0.275mm >= 0.25mm hole clearance & 0.40mm >= 0.35mm hole-to-hole!
     nc = ds.m_NetSettings.GetDefaultNetclass()
     nc.SetTrackWidth(mm(0.18))
     nc.SetClearance(mm(min_clear))
     nc.SetViaDiameter(mm(0.55))
     nc.SetViaDrill(mm(0.30))
-    # POWER_TRUNK: wide 0.45 mm trunks for rail-to-rail wide-pitch power nets (never touches 0.4/0.5mm QFN!)
+    # POWER: >= 0.50 mm trunks (0.52 mm) for wide-pitch main/Eurorack power rails!
     pnc = pcbnew.NETCLASS("POWER")
     pnc.SetTrackWidth(mm(power_track))
     pnc.SetClearance(mm(min_clear))
     pnc.SetViaDiameter(mm(0.65))
     pnc.SetViaDrill(mm(0.30))
     ds.m_NetSettings.SetNetclass("POWER", pnc)
-    # POWER_QFN: 0.25 mm power traces compatible with 0.50 mm-pitch TPS65131 QFN-24 pins (0.25+0.15=0.40 <= 0.50!)
+    # POWER_QFN: 0.25 mm pad-entry class (0.15mm clearance fits 0.50mm QFN-24 pads cleanly!)
     qnc = pcbnew.NETCLASS("POWER_QFN")
     qnc.SetTrackWidth(mm(0.25))
     qnc.SetClearance(mm(min_clear))
@@ -182,7 +183,7 @@ def configure_2layer_rules(board: pcbnew.BOARD, min_track: float = 0.15, min_cle
         "USB_VBUS_RAW", "USB_VBUS", "USB_POST_DIODE", "VIN_3V3_LDO",
     }
     power_qfn_nets = {
-        "+5V_BUCK", "PMIC_INP", "PMIC_SWN", "+13V9_RAW", "-13V7_RAW",
+        "+5V_BUCK", "PMIC_INP", "PMIC_SWN", "+14V6_RAW", "-14V6_RAW",
     }
     for pname in power_trunk_nets:
         if board.FindNet(pname) is not None:
@@ -331,8 +332,9 @@ def build_ui_mezzanine() -> None:
     by_ref["JP_OLED_PWR"].SetPosition(pt(33.5, 5.0))
     by_ref["JP_OLED_PWR"].SetOrientationDegrees(0.0)
 
-    # BTB Mating Sockets — EXACT world coordinate parity with main_board (< 0.001 mm!)
-    # ui_mezzanine origin_world = (6.40, 160.85) -> X_mezz = X_w - 6.40, Y_mezz = 160.85 - Y_w
+    # BTB Mating Sockets — placed on BOTTOM (B.Cu) with EXACT world coordinate parity (< 0.001 mm!)
+    # BTB_Socket_2x08_P2.54mm_BottomMate has even pins mirrored to x=-2.54 in F.Cu definition, so
+    # Flip(pos, False) (which sets layer=B.Cu, rot=180) places Pin 1 at (bx, by) and Pin 2 at (bx+2.54, by)!
     ox_m, oy_m = CONTRACT["boards"]["ui_mezzanine"]["kicad_origin_world_mm"]
     for btb_ref in ["J_BTB_AUDIO_CV", "J_BTB_UI_DIG"]:
         spec = CONTRACT["btb_mating_world_mm"][btb_ref]
@@ -341,6 +343,9 @@ def build_ui_mezzanine() -> None:
         fp = by_ref[btb_ref]
         fp.SetPosition(pt(bx, by))
         fp.SetOrientationDegrees(0.0)
+        if fp.GetLayer() != pcbnew.B_Cu:
+            fp.Flip(pt(bx, by), False)
+        fp.SetOrientationDegrees(180.0)
 
     hide_value_and_tidy_refs(board, ref_size=0.90, show_refs=set())
     add_silk_text(board, "BEADS UI MEZZANINE (PURE THT)", 34.0, 2.0, size=1.0, thick=0.15)
@@ -365,7 +370,7 @@ def build_main_board() -> None:
     pcb_path = ROOT / "hardware" / "main_board" / "main_board.kicad_pcb"
     board = pcbnew.LoadBoard(str(pcb_path))
     clear_graphics_and_zones(board)
-    configure_2layer_rules(board, min_track=0.15, min_clear=0.15, power_track=0.45)
+    configure_2layer_rules(board, min_track=0.15, min_clear=0.15, power_track=0.52)
 
     W, H = CONTRACT["boards"]["main_board"]["dimensions_mm"]
     ox_mb, oy_mb = CONTRACT["boards"]["main_board"]["kicad_origin_world_mm"]
@@ -429,21 +434,21 @@ def build_main_board() -> None:
     sw_pads = {p.GetName(): (pcbnew.ToMM(p.GetPosition().x), pcbnew.ToMM(p.GetPosition().y)) for p in sw_fp.Pads()}
     sw_cx = sw_pads["2"][0]
     sw_tx = nc["SW_MIDI_AB"]["x_center"] - ox_mb
-    # fp_y=4.50 puts Pads 4,5,6 at Y=1.20mm (0.50mm edge clearance > 0.35mm), actuator tip protrudes past North edge!
-    sw_fp.SetPosition(pt(sw_tx - sw_cx, 4.50))
+    # fp_y=4.80 puts Pads 4,5,6 at Y=1.50mm (0.80mm edge clearance so MIDI_IN_TIP routes cleanly above!), actuator tip protrudes past North edge!
+    sw_fp.SetPosition(pt(sw_tx - sw_cx, 4.80))
     placed.add("SW_MIDI_AB")
     # Sanity assert: Pad 3 (TYPE A Ring) must be WEST (smaller X) of Pad 1 (TYPE B Tip)!
     sw_pads2 = {p.GetName(): (pcbnew.ToMM(p.GetPosition().x), pcbnew.ToMM(p.GetPosition().y)) for p in sw_fp.Pads()}
     assert sw_pads2["3"][0] < sw_pads2["1"][0], f"SW_MIDI_AB Left/Right polarity wrong: {sw_pads2}"
 
-    # USB-C TYPE-C-31-M-12:
-    # At rot=0, front mating face Y=+3.65, SMD pads Y=-4.045.
-    # At rot=180, front face is at fp_y - 3.65 -> want at Y_pcb = -0.40 (Y_w=182.00 inner North wall) -> fp_y = 3.25!
+    # USB-C TYPE-C-31-M-12 (advanced 0.85 mm North to Y_pcb=2.40 -> front tongue at Y_w=182.85 mm,
+    # protruding 0.85 mm into North wall so USB-C plugs reach <= 0.45 mm from exterior pocket floor!)
     usb_tx = nc["J_USB"]["x_center"] - ox_mb
-    P("J_USB", usb_tx, 3.25, 180.0)
+    P("J_USB", usb_tx, 2.40, 180.0)
 
-    # Panel DC Jack 2-pin header J_PWR_IN right beside panel DC jack (X_w=141.5 -> X_pcb=136.5)
-    P("J_PWR_IN", 136.5, 14.0, 0.0)
+    # Panel DC Jack 2-pin header J_PWR_IN placed clear South of full 17.6mm DC_JACK (Y_w>=168) & North of Beads (Y_w<=159.6)!
+    # At (135.5, 19.0, rot=90): Pin1=(135.5, 19.0), Pin2=(132.96, 19.0) -> X_w=[136.7, 141.8], Y_w=[161.3, 163.9]!
+    P("J_PWR_IN", 135.5, 19.0, 90.0)
 
     # 3. BTB Mating Headers (0.000 mm world XY parity with ui_mezzanine!)
     for btb_ref in ["J_BTB_AUDIO_CV", "J_BTB_UI_DIG"]:
@@ -451,8 +456,16 @@ def build_main_board() -> None:
         bx, by = w2p(spec["pin1_world_x"], spec["pin1_world_y"])
         P(btb_ref, bx, by, 0.0)
 
-    # 4. Eurorack 2x5 Power Header (wide-open Right 14HP Beads bay, clear of all MHs & LDOs!)
-    P("J_EURO_PWR", 126.0, 102.0, 0.0)
+    # 4. Eurorack 2x5 Power Header relocated SOUTH of Beads rear PCB (Y_w=48.1 < 54.6 -> 32.4 mm vertical headroom
+    #    for full 14mm mated 2x5 IDC plug + strain-relief ribbon loop!). Rotated 90 deg so Pins 1..10 run East-West!
+    j_euro = by_ref["J_EURO_PWR"]
+    j_euro.SetOrientationDegrees(90.0)
+    j_euro.SetPosition(pt(0.0, 0.0))
+    epads = [(pcbnew.ToMM(p.GetPosition().x), pcbnew.ToMM(p.GetPosition().y)) for p in j_euro.Pads()]
+    ecx = (min(x for x, _ in epads) + max(x for x, _ in epads)) / 2.0
+    ecy = (min(y for _, y in epads) + max(y for _, y in epads)) / 2.0
+    j_euro.SetPosition(pt(96.0 - ecx, 133.5 - ecy))
+    placed.add("J_EURO_PWR")
 
     # 5. South-Edge Footswitch & Apron Status LED Headers (clear of MH101..103 at Y=140.6!)
     P("J_FS1",     24.0, 140.0, 90.0)
@@ -463,29 +476,29 @@ def build_main_board() -> None:
     # =========================================================================
     # ZONE 1 (NORTH-EAST, X=84..138, Y=18..96): POWER, USB ISOLATION, ±12V LDOs
     # =========================================================================
-    # Input protection & Pi-Filter (X=122..137, Y=20..42, clear of MH106 at (137, 29.6)!)
-    P("F1",      131.5, 19.5, 90.0)
-    P("D_TVS1",  125.0, 20.0, 0.0)
-    P("Q_RPP1",  128.0, 27.5, 0.0)
-    P("D_Z_RPP", 123.0, 27.5, 0.0)
-    P("R1",      125.5, 31.5, 0.0)
-    P("R2",      129.0, 31.5, 0.0)
-    P("C1",      122.0, 35.5, 0.0)
-    P("C2",      127.0, 35.5, 0.0)
-    P("FB1",     131.0, 35.5, 0.0)
-    P("C3",      135.5, 38.0, 90.0)
-    P("C4",      131.0, 41.0, 0.0)
-    P("C5",      126.5, 41.0, 0.0)
+    # Input protection & Pi-Filter (clear of J_PWR_IN at (134,19) and MH106 at (137.0, 39.6)!)
+    P("F1",      126.5, 22.5, 0.0)
+    P("D_TVS1",  134.0, 27.5, 0.0)
+    P("Q_RPP1",  126.5, 28.0, 0.0)
+    P("D_Z_RPP", 121.0, 28.0, 0.0)
+    P("R1",      123.5, 32.0, 0.0)
+    P("R2",      127.5, 32.0, 0.0)
+    P("C1",      119.5, 36.0, 0.0)
+    P("C2",      124.5, 36.0, 0.0)
+    P("FB1",     129.0, 36.0, 0.0)
+    P("C3",      125.0, 40.5, 0.0)
+    P("C4",      130.0, 40.5, 0.0)
+    P("C5",      119.5, 40.5, 0.0)
 
     # Stage 1: TPS5430DDAR (+5.08V Buck) around (110, 42)
     P("U_BUCK5", 110.0, 42.0, 0.0)
     P("C_BOOT",  105.0, 38.0, 0.0)
-    P("D_BUCK",  117.5, 42.0, 90.0)
-    P("L1",      117.5, 50.5, 0.0)
-    P("C6",      125.0, 48.0, 0.0)
-    P("C7",      125.0, 52.5, 0.0)
-    P("C8",      129.5, 48.0, 90.0)
-    P("R3",      129.5, 52.5, 90.0)
+    P("D_BUCK",  117.5, 46.5, 90.0)
+    P("L1",      124.5, 48.0, 0.0)
+    P("C6",      131.5, 48.0, 0.0)
+    P("C7",      131.5, 52.5, 0.0)
+    P("C8",      136.0, 48.0, 90.0)
+    P("R3",      136.0, 52.5, 90.0)
     P("R4",      104.0, 44.5, 0.0)
     P("R5",      104.0, 47.0, 0.0)
     P("R6",      104.0, 49.5, 0.0)
@@ -493,7 +506,7 @@ def build_main_board() -> None:
     P("R8",      108.5, 51.0, 0.0)
     P("R9",      108.5, 53.5, 0.0)
 
-    # Stage 2: TPS65131RGER (±13.8V) around (96, 63)
+    # Stage 2: TPS65131RGER (±14.6V, PSP/PSN=GND, I_VREF=6.07uA) around (96, 63)
     P("U_PMIC",  96.0, 63.0, 0.0)
     P("C9",      90.0, 57.5, 0.0)
     P("C10",     90.0, 60.5, 0.0)
@@ -503,31 +516,31 @@ def build_main_board() -> None:
     P("C_VREF", 102.5, 65.5, 0.0)
     P("C_CP",   102.5, 60.5, 0.0)
     P("C_CN",   102.5, 63.0, 0.0)
-    # +13.9V Boost (North of U_PMIC)
+    # +14.65V Boost (North of U_PMIC; C13 placed directly beside U_LDO_P12.3 <= 5.5mm!)
     P("L2",      95.0, 52.0, 0.0)
     P("D_POS",   87.0, 52.0, 0.0)
     P("C11",     87.0, 46.5, 0.0)
     P("C12",     92.5, 46.5, 0.0)
-    P("C13",     97.5, 46.5, 0.0)
+    P("C13",    106.5, 61.5, 90.0)
     P("R12",    101.0, 55.5, 0.0)
     P("R13",    101.0, 58.0, 0.0)
     P("R14",    104.0, 56.0, 0.0)
-    # -13.7V Inverter (South of U_PMIC)
+    # -14.56V Inverter (South of U_PMIC; C16 placed <= 6.5mm from U_PMIC.15!)
     P("L3",      95.0, 74.0, 0.0)
     P("D_NEG",  103.0, 74.0, 0.0)
     P("C14",     92.0, 81.0, 0.0)
     P("C15",     97.5, 81.0, 0.0)
-    P("C16",    102.5, 81.0, 0.0)
-    P("R15",    102.5, 68.0, 0.0)
-    P("R16",    105.5, 68.0, 0.0)
+    P("C16",    101.5, 68.5, 90.0)
+    P("R15",    105.5, 68.0, 0.0)
+    P("R16",    105.5, 70.5, 0.0)
     P("R17",    105.5, 65.5, 0.0)
 
-    # Stage 3: Linear ±12.0V Post-LDOs (DPAK) + Ferrite LC -> J_EURO_PWR (X=110..138, Y=55..93)
+    # Stage 3: Linear ±12.0V Post-LDOs (DPAK) + Ferrite LC -> J_EURO_PWR
     P("U_LDO_P12",   115.0, 61.5, 0.0)
-    P("R18",         109.5, 68.0, 0.0)
-    P("R19",         113.0, 68.0, 0.0)
-    P("R20",         116.5, 68.0, 0.0)
-    P("C_ADJ",       113.0, 71.5, 0.0)
+    P("R18",         109.5, 69.0, 0.0)
+    P("R19",         113.0, 69.0, 0.0)
+    P("R20",         116.5, 69.0, 0.0)
+    P("C_ADJ",       113.0, 72.5, 0.0)
     P("D_LM1",       115.0, 56.0, 0.0)
     P("D_LM2",       121.5, 56.0, 0.0)
     P("C17",         132.5, 58.5, 0.0)
@@ -539,27 +552,25 @@ def build_main_board() -> None:
     P("U_LDO_N12",   113.5, 82.0, 0.0)
     P("C20",         113.5, 89.5, 0.0)
     P("R_ESR_N12",   119.0, 89.5, 0.0)
-    P("C21",         123.0, 89.5, 0.0)
+    P("C21",         120.0, 85.0, 0.0)
     P("D_CLAMP_N12", 127.0, 89.5, 90.0)
     P("FB3",         131.0, 89.5, 0.0)
     P("C22",         134.0, 81.5, 0.0)
     P("C23",         127.0, 84.5, 0.0)
 
-    # Stage 4: USB-C ESD + Bidirectional Zero-Backfeed ORing + AMS1117-3.3 (X=85..137, Y=11..38)
-    P("F_USB",      123.5, 11.0, 0.0)
-    P("U_USB_ESD",  129.5, 11.5, 0.0)
-    P("R21",        120.5, 14.5, 0.0)
-    P("R22",        124.0, 14.5, 0.0)
-    P("R23",        128.0, 15.5, 0.0)
-    P("R24",        131.5, 15.5, 0.0)
-    P("R25",        119.5, 18.0, 0.0)
-    P("R26",        119.5, 20.5, 0.0)
-    P("D_USB_FWD",  119.0, 24.0, 0.0)
+    # Stage 4: USB-C ESD + Bidirectional Zero-Backfeed ORing (D_OR_PED 1N5819WS!) + AMS1117-3.3
+    P("F_USB",      123.5, 10.5, 0.0)
+    P("U_USB_ESD",  129.5, 11.0, 0.0)
+    P("R21",        120.5, 14.0, 0.0)
+    P("R22",        124.0, 14.0, 0.0)
+    P("R23",        128.0, 15.0, 0.0)
+    P("R24",        131.5, 15.0, 0.0)
+    P("R25",        119.5, 17.5, 0.0)
+    P("R26",        119.5, 20.0, 0.0)
+    P("D_USB_FWD",  119.0, 23.5, 0.0)
     P("Q_USB",      114.0, 25.0, 0.0)
     P("R27",        114.0, 29.0, 0.0)
-    P("Q_PED_OR",   114.0, 33.0, 0.0)
-    P("R28",        109.5, 33.0, 0.0)
-    P("Q_PED_DRV",  105.0, 33.0, 0.0)
+    P("D_OR_PED",   110.0, 32.5, 0.0)
     P("C24",        106.5, 28.0, 0.0)
     P("C25",        102.5, 28.0, 0.0)
     P("U_LDO_3V3",   95.5, 28.0, 0.0)
@@ -671,14 +682,19 @@ def build_main_board() -> None:
     P("C42",     72.0, 78.0, 0.0)
 
     # =========================================================================
-    # ZONE 3 (SOUTH-WEST, X=8..70, Y=104..134): +2.495V REF, 4x MCP4822, 4x TL072 CV
+    # ZONE 3 (SOUTH-WEST, X=8..82, Y=92..134): +2.495V REF, U_LVL, 4x MCP4822, 4x TL072 CV
     # =========================================================================
-    P("U_REF",      12.0, 108.0, 0.0)
-    P("R76",        12.0, 104.0, 0.0)
-    P("C52",        16.5, 108.0, 0.0)
-    P("U_VREF_BUF", 24.0, 108.0, 0.0)
-    P("C53",        20.5, 103.5, 0.0)
-    P("C54",        27.5, 103.5, 0.0)
+    P("U_REF",      11.5, 108.0, 0.0)
+    P("R76",        11.5, 104.0, 0.0)
+    P("R143",       15.5, 108.0, 0.0)
+    P("C52",        19.0, 108.0, 0.0)
+    P("U_VREF_BUF", 24.5, 108.0, 0.0)
+    P("C53",        21.0, 103.5, 0.0)
+    P("C54",        28.0, 103.5, 0.0)
+
+    # SN74AHCT541PWR (U_LVL) 3.3V->5.08V I_off SPI/CS Level Shifter between U_MCU (East) & U_DAC0..3 (West)
+    P("U_LVL",      77.0,  96.0, 180.0)
+    P("C92",        77.0, 101.5,   0.0)
 
     # 4x MCP4822 in a clean row along Y=114 (X=38, 49, 60, 71)
     for i in range(4):
@@ -760,13 +776,13 @@ def build_main_board() -> None:
     P("R136", 61.0, 96.0, 0.0)
     P("R137", 57.0, 99.0, 0.0)
 
-    # Apron Status LED NMOS drivers right behind J_LED_FS1 / J_LED_FS2
-    P("Q_LED1", 86.0, 130.0, 0.0)
-    P("R138",   90.5, 130.0, 0.0)
-    P("R139",   94.5, 130.0, 0.0)
-    P("Q_LED2",108.0, 130.0, 0.0)
-    P("R140",  112.5, 130.0, 0.0)
-    P("R141",  116.5, 130.0, 0.0)
+    # Apron Status LED NMOS drivers cleanly flanking J_LED_FS1 / J_LED_FS2 (clear of J_EURO_PWR at (96, 133.5)!)
+    P("Q_LED1", 44.0, 140.0, 0.0)
+    P("R138",   48.5, 140.0, 0.0)
+    P("R139",   52.5, 140.0, 0.0)
+    P("Q_LED2",124.0, 132.0, 0.0)
+    P("R140",  128.5, 132.0, 0.0)
+    P("R141",  132.5, 132.0, 0.0)
 
     # Verify 100% of footprints were explicitly placed!
     unplaced = sorted(set(by_ref.keys()) - placed)
@@ -786,22 +802,40 @@ def build_main_board() -> None:
         "J_OUT_R", "J_OUT_L", "J_IN_R", "J_IN_L", "J_MIDI_THRU", "SW_MIDI_AB", "J_MIDI_IN",
         "J_USB", "J_PWR_IN", "J_EURO_PWR", "J_BTB_AUDIO_CV", "J_BTB_UI_DIG",
         "J_FS1", "J_FS2", "J_LED_FS1", "J_LED_FS2", "SW_BOOT", "K1", "K2",
-        "U_MCU", "U_OPTO", "U_BUCK5", "U_PMIC", "U_LDO_P12", "U_LDO_N12", "U_LDO_3V3",
+        "U_MCU", "U_LVL", "U_OPTO", "U_BUCK5", "U_PMIC", "U_LDO_P12", "U_LDO_N12", "U_LDO_3V3",
     }
     hide_value_and_tidy_refs(board, ref_size=0.80, show_refs=show_refs)
+    # Keep visible IC/connector refs strictly clear of neighboring silkscreen, pads & board edges
+    for rref, rx, ry in [
+        ("J_USB",      124.5,   8.6),
+        ("J_PWR_IN",   136.8,  15.6),
+        ("J_EURO_PWR",  79.5, 134.5),
+        ("U_LVL",       77.0,  90.8),
+        ("SW_BOOT",    116.0,  95.8),
+        ("SW_MIDI_AB", 100.0,   7.5),
+        ("J_MIDI_THRU", 79.5,  22.0),
+        ("J_MIDI_IN",  115.5,  13.0),
+        ("U_OPTO",     106.0,  24.2),
+        ("U_LDO_3V3",   95.5,  32.6),
+        ("U_LDO_P12",  123.5,  61.5),
+    ]:
+        if rref in by_ref:
+            by_ref[rref].Reference().SetPosition(pt(rx, ry))
+            if rref == "J_PWR_IN":
+                by_ref[rref].Reference().SetTextAngleDegrees(0.0)
 
-    # Mandatory Silkscreen Markings (plan/01, plan/02, plan/03) — positioned cleanly clear of pads/courtyards!
-    add_silk_text(board, "RED STRIPE / -12V (PINS 1-2)", 129.0, 94.0, size=0.95, thick=0.17)
-    add_silk_line(board, 123.5, 96.5, 130.5, 96.5, width=0.60)
-    add_silk_text(board, "9-18V DC CENTER NEGATIVE", 132.5, 6.5, size=0.85, thick=0.15)
-    add_silk_text(board, "P1:+V(SLV) P2:GND(CTR)", 135.5, 9.2, size=0.80, thick=0.14)
-    add_silk_text(board, "<A|MIDI|B>", 100.0, 9.8, size=0.85, thick=0.15)
-    add_silk_text(board, "OUT R", 10.5, 22.5, size=1.0, thick=0.18)
-    add_silk_text(board, "OUT L/M", 30.5, 22.5, size=1.0, thick=0.18)
-    add_silk_text(board, "IN R", 50.5, 22.5, size=1.0, thick=0.18)
-    add_silk_text(board, "IN L/M", 70.5, 22.5, size=1.0, thick=0.18)
-    add_silk_text(board, "BOOTSEL", 116.0, 94.0, size=0.85, thick=0.15)
-    add_silk_text(board, "BEADS PEDALBOARD SKIFF MAIN_BOARD REV 1.0", 71.0, 144.5, size=1.1, thick=0.18)
+    # Mandatory Silkscreen Markings (plan/01, plan/02, plan/03) — positioned cleanly clear of pads/courtyards/edges!
+    add_silk_text(board, "RED STRIPE / -12V (PINS 1-2)", 96.0, 126.0, size=0.85, thick=0.15)
+    add_silk_line(board, 84.4, 129.0, 84.4, 138.2, width=0.55)
+    add_silk_text(board, "9-18V CTR-NEG",    136.8, 13.4, size=0.80, thick=0.14)
+    add_silk_text(board, "P1:+V P2:GND",     136.8, 22.8, size=0.80, thick=0.14)
+    add_silk_text(board, "<A|MIDI|B>",       100.0,  9.5, size=0.82, thick=0.14)
+    add_silk_text(board, "OUT R",             10.5, 22.5, size=1.0,  thick=0.18)
+    add_silk_text(board, "OUT L/M",           30.5, 22.5, size=1.0,  thick=0.18)
+    add_silk_text(board, "IN R",              50.5, 22.5, size=1.0,  thick=0.18)
+    add_silk_text(board, "IN L/M",            70.5, 22.5, size=1.0,  thick=0.18)
+    add_silk_text(board, "BOOTSEL",          116.0, 93.8, size=0.82, thick=0.14)
+    add_silk_text(board, "BEADS PEDALBOARD SKIFF MAIN_BOARD REV 1.1", 71.0, 144.8, size=1.05, thick=0.17)
 
     # Continuous solid B.Cu GND plane (>90% unbroken copper!)
     add_gnd_zone(board, W, H, layer=pcbnew.B_Cu, clearance=0.22, edge_inset=0.40)

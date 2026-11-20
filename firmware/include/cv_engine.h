@@ -50,7 +50,13 @@ typedef struct {
     uint32_t        last_tap_us;
     uint32_t        tap_period_us;    /* Quarter-note period (default 500,000 us = 120 BPM) */
     uint32_t        internal_clk_acc_us;
+    uint8_t         ext_clk_div6_cnt; /* 0..5 wrap counter for 24 PPQN -> 16th-note (zero div!) */
     bool            master_clk_pulse;
+
+    /* Interactive 1V/Oct calibration live DAC override (UI_PAGE_SYSTEM -> 1V/OCT CALIB) */
+    bool            cal_override_active;
+    uint8_t         cal_override_ch;
+    uint16_t        cal_override_code;
 
     /* Rotary encoder 16-state Gray-code LUT decoder */
     uint8_t         enc_prev_ab;
