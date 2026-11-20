@@ -3,7 +3,7 @@
   (generator "eeschema")
   (generator_version "9.0")
   (uuid "0d5963c7-ed32-4506-8052-32f82a2df38d")
-  (paper "A4")
+  (paper "A2")
 
   (lib_symbols
     (symbol "Amplifier_Operational:TL072"

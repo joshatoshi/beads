@@ -1,7 +1,7 @@
 (export (version "E")
   (design
-    (source "/home/yerbaadmin/beads/.lane/trees/r1-carbon/hardware/ui_mezzanine/ui_mezzanine.kicad_sch")
-    (date "2026-11-20T05:59:27+0000")
+    (source "/home/yerbaadmin/beads/hardware/ui_mezzanine/ui_mezzanine.kicad_sch")
+    (date "2026-11-20T17:51:10+0000")
     (tool "Eeschema 9.0.2+dfsg-1")
     (sheet (number "1") (name "/") (tstamps "/")
       (title_block
@@ -477,7 +477,7 @@
     (library (logical "Switch")
       (uri "/usr/share/kicad/symbols/Switch.kicad_sym"))
     (library (logical "beads_custom")
-      (uri "/home/yerbaadmin/beads/.lane/trees/r1-carbon/hardware/ui_mezzanine/../beads_custom.kicad_sym")))
+      (uri "/home/yerbaadmin/beads/hardware/ui_mezzanine/../beads_custom.kicad_sym")))
   (nets
     (net (code "1") (name "/BTN_BACK") (class "Default")
       (node (ref "J_BTB_UI_DIG") (pin "14") (pinfunction "Pin_14") (pintype "passive"))

@@ -32,9 +32,9 @@ ARM_LDFLAGS := -mcpu=cortex-m0plus -mthumb -T target/rp2040.ld -nostartfiles \
 
 HOST_CFLAGS := -O2 -std=c11 -Iinclude -Wall -Wextra -Werror -DBEADS_HOST_UNIT_TEST=1
 
-.PHONY: all target test check_symbols check_stack clean
+.PHONY: all target test check_symbols check_stack check_hal_invariants clean
 
-all: target check_symbols check_stack test
+all: target check_symbols check_stack check_hal_invariants test
 
 target: $(BUILD_DIR)/beads_bridge.uf2
 
@@ -62,6 +62,24 @@ check_symbols: $(BUILD_DIR)/beads_bridge.elf
 # Gate: verify every compiled target function's stack frame fits comfortably inside PICO_CORE1_STACK_SIZE (4096 B)!
 check_stack: $(BUILD_DIR)/beads_bridge.elf
 	@python3 -c 'import pathlib, sys; su=list(pathlib.Path("build/target").rglob("*.su")); assert su; worst=0; bad=[]; [bad.append((l.strip(), int(l.split()[1]))) for f in su for l in f.read_text().splitlines() if l.strip() and int(l.split()[1]) > 768]; worst=max(int(l.split()[1]) for f in su for l in f.read_text().splitlines() if l.strip()); print(f"[PASS] -fstack-usage checked ({len(su)} units): max frame = {worst} bytes (<= 768 B inside 4096 B Core 1 stack)"); assert not bad, f"Oversized stack frames: {bad}"'
+
+# Gate: verify RP2040 EP1..EP3 EP_CTRL_INTERRUPT_PER_BUFFER (1u<<29u) in both HALs + ELF binary, and 16MB Flash size in CMakeLists.txt
+check_hal_invariants: $(BUILD_DIR)/beads_bridge.elf
+	@python3 -c 'import pathlib, re, struct; \
+	rp = pathlib.Path("target/rp2040_hal.c").read_text(); \
+	sdk = pathlib.Path("target/pico_sdk_hal.c").read_text(); \
+	cm = pathlib.Path("CMakeLists.txt").read_text(); \
+	rp_eps = re.findall(r"USB_EP_CTRL\([^)]+\)\s*=\s*([^;]+);", rp); \
+	sdk_eps = re.findall(r"usb_dpram->ep_ctrl\[\d+\]\.(?:in|out)\s*=\s*([^;]+);", sdk); \
+	assert len(rp_eps) == 4 and all("EP_CTRL_INTERRUPT_PER_BUFFER" in e for e in rp_eps), f"rp2040_hal.c EP_CTRL missing bit 29: {rp_eps}"; \
+	assert len(sdk_eps) == 4 and all("EP_CTRL_INTERRUPT_PER_BUFFER" in e for e in sdk_eps), f"pico_sdk_hal.c ep_ctrl missing bit 29: {sdk_eps}"; \
+	assert rp.index("usb_ep0_on_in_complete") < rp.index("usb_ep0_handle_setup"), "rp2040_hal.c must service BUFF_STATUS before SETUP_REC"; \
+	assert sdk.index("usb_ep0_on_in_complete") < sdk.index("usb_ep0_handle_setup"), "pico_sdk_hal.c must service buf_status before SETUP_REC"; \
+	assert "PICO_FLASH_SIZE_BYTES=16777216" in cm, "CMakeLists.txt missing PICO_FLASH_SIZE_BYTES=16777216"; \
+	elf = pathlib.Path("build/beads_bridge.elf").read_bytes(); \
+	missing = [hex(w) for w in (0xA8000180, 0xAC000200, 0xA8000240, 0xA8000280) if struct.pack("<I", w) not in elf]; \
+	assert not missing, f"Compiled ELF missing EP_CTRL words: {missing}"; \
+	print("[PASS] RP2040 USB EP1..EP3 EP_CTRL_INTERRUPT_PER_BUFFER (0xA8000180..0xA8000280) & 16MB PICO_FLASH_SIZE_BYTES verified!")'
 
 $(BUILD_DIR)/test_beads_firmware: $(CORE_SRCS) tests/test_beads_firmware.c
 	@mkdir -p $(BUILD_DIR)

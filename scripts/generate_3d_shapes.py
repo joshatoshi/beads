@@ -99,6 +99,20 @@ def build_all_custom_3dshapes() -> list[pathlib.Path]:
     # SolderJumper_OLED_RevPWR (flat copper feature)
     exported.append(export_model("SolderJumper_OLED_RevPWR", bd.Pos(0.0, 0.0, 0.05) * bd.Box(4.20, 3.80, 0.10)))
 
+    # 10. THT 3mm LED (D_PEAK on ui_mezzanine: pads at (0,0) and (+2.54,0) -> center (+1.27, 0))
+    led_l1 = bd.Pos(0.00, 0.00, 2.00) * bd.Box(0.50, 0.50, 9.00)
+    led_l2 = bd.Pos(2.54, 0.00, 2.00) * bd.Box(0.50, 0.50, 9.00)
+    led_flange = bd.Pos(1.27, 0.00, 7.00) * bd.Cylinder(1.90, 1.00)
+    led_body = bd.Pos(1.27, 0.00, 9.00) * bd.Cylinder(1.50, 3.00)
+    led_dome = bd.Pos(1.27, 0.00, 10.50) * bd.Sphere(1.50)
+    exported.append(export_model("LED_D3.0mm", led_l1 + led_l2 + led_flange + led_body + led_dome))
+
+    # 11. 1x04 Vertical 2.54mm Pin Socket (J_OLED on ui_mezzanine: pads at Y_3d = 0..-7.62 -> center (0, -3.81))
+    sock_body = bd.Pos(0.00, -3.81, 2.50) * bd.Box(2.54, 10.16, 5.00)
+    for k in range(4):
+        sock_body = sock_body + bd.Pos(0.00, -k * 2.54, -1.25) * bd.Box(0.50, 0.50, 2.50)
+    exported.append(export_model("PinSocket_1x04_P2.54mm_Vertical", sock_body))
+
     return exported
 
 
@@ -157,9 +171,51 @@ def link_models_into_custom_footprints() -> None:
         mod_path.write_text(new_txt, encoding="utf-8")
 
 
+def link_models_onto_pcbs() -> None:
+    """Link local ${KIPRJMOD}/../beads_custom.3dshapes/*.step models onto ui_mezzanine (21/21)
+    and SW_MIDI_AB on main_board via KiCad pcbnew API (zero raw text editing of .kicad_pcb)."""
+    import pcbnew
+
+    fpid_to_step = {
+        "Connector_Audio:Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical_CircularHoles": "Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step",
+        "Potentiometer_THT:Potentiometer_Alpha_RD902F-40-00D_Dual_Vertical": "Potentiometer_Dual_9mm_Vertical.step",
+        "Button_Switch_THT:SW_PUSH_6mm_H13mm": "SW_PUSH_6mm_H13mm.step",
+        "Rotary_Encoder:RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm_CircularMountingHoles": "RotaryEncoder_Alps_EC11E_H20mm.step",
+        "LED_THT:LED_D3.0mm": "LED_D3.0mm.step",
+        "Connector_PinSocket_2.54mm:PinSocket_1x04_P2.54mm_Vertical": "PinSocket_1x04_P2.54mm_Vertical.step",
+        "Button_Switch_THT:SW_CK_JS202011AQN_DPDT_Angled": "SW_CK_JS202011AQN_DPDT_Angled.step",
+    }
+
+    for rel_pcb in ("hardware/ui_mezzanine/ui_mezzanine.kicad_pcb", "hardware/main_board/main_board.kicad_pcb"):
+        pcb_path = ROOT / rel_pcb
+        board = pcbnew.LoadBoard(str(pcb_path))
+        updated = 0
+        for fp in board.GetFootprints():
+            fpid = fp.GetFPIDAsString()
+            if fpid not in fpid_to_step:
+                continue
+            target_uri = f"${{KIPRJMOD}}/../beads_custom.3dshapes/{fpid_to_step[fpid]}"
+            models = fp.Models()
+            if len(models) == 1 and models[0].m_Filename == target_uri:
+                continue
+            models.clear()
+            m = pcbnew.FP_3DMODEL()
+            m.m_Filename = target_uri
+            m.m_Show = True
+            m.m_Scale = pcbnew.VECTOR3D(1.0, 1.0, 1.0)
+            m.m_Offset = pcbnew.VECTOR3D(0.0, 0.0, 0.0)
+            m.m_Rotation = pcbnew.VECTOR3D(0.0, 0.0, 0.0)
+            fp.Add3DModel(m)
+            updated += 1
+        if updated > 0:
+            pcbnew.SaveBoard(str(pcb_path), board)
+            print(f"[OK] Linked {updated} local ${{KIPRJMOD}} STEP model(s) in {rel_pcb}")
+
+
 def main() -> int:
     exported = build_all_custom_3dshapes()
     link_models_into_custom_footprints()
+    link_models_onto_pcbs()
     print(f"[OK] Generated {len(exported)} STEP models in {SHAPES_DIR} and linked ${'{KIPRJMOD}'} URIs")
     return 0
 

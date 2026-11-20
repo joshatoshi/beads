@@ -6,7 +6,7 @@ Worktree-portable: resolves repo root dynamically via Path(__file__).resolve().p
 Generates:
   - cad/exports/beads_enclosure_shell.stl & .step  (Print-ready Bambu Lab X2D PETG-HF case)
   - cad/exports/beads_bottom_lid.stl & .step       (Flush 3.0mm bottom service lid)
-  - cad/exports/beads_full_assembly.step           (Complete 90+ solid populated assembly)
+  - cad/exports/beads_full_assembly.step           (Complete 417-solid populated assembly)
   - cad/exports/render_iso_front.png               (Studio 3/4 front isometric render)
   - cad/exports/render_north_io.png                (North-wall pedalboard I/O & spotfaces view)
   - cad/exports/render_bottom_interior.png         (Exploded/interior underside stackup view)
@@ -235,20 +235,39 @@ def build_enclosure_shell(installed_inserts: bool = False) -> bd.Solid:
         cuts.append(cyl_y(spec["x_center"], spec["z_center"], 181.00, 186.50, spec["bore_dia"]))
         cuts.append(cyl_y(spec["x_center"], spec["z_center"], 184.50, 186.50, spec["spotface_dia"]))
 
-    # 7b. 2x Same Sky SJ1-3523N: Ø6.40mm bore + Ø9.80mm x 1.00mm exterior TRS plug-shoulder relief
+    # 7b. 2x Same Sky SJ1-3523N: Ø6.40mm bore + Ø9.80mm exterior TRS plug-shoulder relief (floor at Y=184.20mm,
+    #     0.30mm behind SJ1-3523N's Y=184.50mm front bushing lip after the +0.30mm South NPTH-web shift, leaving 2.20mm wall)
     for jref in ("J_MIDI_THRU", "J_MIDI_IN"):
         spec = nc[jref]
         cuts.append(cyl_y(spec["x_center"], spec["z_center"], 181.00, 186.50, spec["bore_dia"]))
-        cuts.append(cyl_y(spec["x_center"], spec["z_center"], 184.60, 186.50, 9.80))
+        cuts.append(cyl_y(spec["x_center"], spec["z_center"], spec.get("plug_relief_y_floor", 184.20), 186.50, 9.80))
 
-    # 7c. C&K JS202011AQN DPDT MIDI Type A/B Switch: 5.4x3.0mm inner window + 11.6x6.8mm finger-reachable alcove
-    #     Actuator tip reaches Y=182.45mm (+0.15mm proud of Y=182.30mm alcove floor, 3.15mm inside Y_outer=185.60mm!)
+    # 7c. C&K JS202011AQN DPDT MIDI Type A/B Switch:
+    #     - 5.4x3.0mm inner through-window (Z=[-38.00, -35.00], strictly above main_board F.Cu Z=-38.40mm)
+    #     - 11.6x6.8mm exterior finger/pick alcove stopping at Y=183.00mm (1.00mm 3-perimeter PETG-HF structural wall rim
+    #       from Y_inner=182.00mm, eliminating any thin membrane and concealing main_board FR4!)
+    #     - Debossed North-wall 'B ◄ ► A' markings (0.60mm deep at Z=-29.80mm per plan/04 §4.3, matching physical throw:
+    #       East/+X/North-view-Left = TYPE B, West/-X/North-view-Right = TYPE A!)
     sws = nc["SW_MIDI_AB"]
     sw_w, sw_h = sws["window_wh"]
+    sw_alc_w, sw_alc_h = sws["alcove_wh"]
+    sw_alc_y = sws["alcove_y_floor"]  # 183.00 mm (>= 1.00 mm inner wall rim)
     cuts.append(box_xyz(sws["x_center"] - sw_w / 2.0, sws["x_center"] + sw_w / 2.0,
                         181.00, 186.50,
                         sws["z_center"] - sw_h / 2.0, sws["z_center"] + sw_h / 2.0))
-    cuts.append(oval_slot_y(sws["x_center"], sws["z_center"], 182.30, 186.50, 11.60, 6.80))
+    cuts.append(oval_slot_y(sws["x_center"], sws["z_center"], sw_alc_y, 186.50, sw_alc_w, sw_alc_h))
+
+    north_plane = bd.Plane(origin=(sws["x_center"], 184.80, -29.60), x_dir=(-1.0, 0.0, 0.0), z_dir=(0.0, 1.0, 0.0))
+    with bd.BuildPart() as bp_deboss:
+        with bd.BuildSketch(north_plane):
+            with bd.Locations((-4.35, 0.0)):
+                bd.Text("B", font_size=4.00, font_style=bd.FontStyle.BOLD)
+            bd.Polygon([(-2.85, 0.0), (-1.20, 1.30), (-1.20, -1.30)], align=None)
+            bd.Polygon([(2.85, 0.0), (1.20, 1.30), (1.20, -1.30)], align=None)
+            with bd.Locations((4.35, 0.0)):
+                bd.Text("A", font_size=4.00, font_style=bd.FontStyle.BOLD)
+        bd.extrude(amount=1.00)
+    cuts.extend(bp_deboss.part.solids())
 
     # 7d. TYPE-C-31-M-12 USB-C: 9.40x3.60mm rounded oval + plan/04 13.00x7.50mm exterior overmold pocket
     #     Pocket floor at Y=183.20mm sits 0.35mm (<= 0.50mm!) ahead of J_USB's Y=182.85mm lip, with 2.69mm web to DC_JACK!
@@ -328,9 +347,15 @@ def build_populated_solids() -> Dict[str, Tuple[bd.Solid, Tuple[float, float, fl
     solids["bottom_lid"] = (build_bottom_lid(), C_LID)
 
     # 2. main_board (142.0 x 146.6 x 1.6 mm at X=[5,147], Y=[35,181.6], Z=[-40.0,-38.4])
+    #    Includes the two 0.70 mm North Edge.Cuts SJ1-3523N collar relief notches (X=x_c+-3.40, Y=[180.90, 181.60])
+    #    matching hardware/main_board/main_board.kicad_pcb & plan/04 §4.2!
     mb_solid = box_xyz(5.00, 147.00, 35.00, 181.60, Z_MAIN_BCU, Z_MAIN_FCU)
     for mh in CONTRACT["boards"]["main_board"]["mounting_holes_world_mm"]:
         mb_solid = (mb_solid - cyl_z(mh["x"], mh["y"], Z_MAIN_BCU - 0.5, Z_MAIN_FCU + 0.5, mh["drill_mm"])).solids()[0]
+    nc_mb = CONTRACT["boards"]["main_board"]["north_wall_connectors_world_mm"]
+    for jref in ("J_MIDI_THRU", "J_MIDI_IN"):
+        jxc = nc_mb[jref]["x_center"]
+        mb_solid = (mb_solid - box_xyz(jxc - 3.40, jxc + 3.40, 180.90, 181.80, Z_MAIN_BCU - 0.5, Z_MAIN_FCU + 0.5)).solids()[0]
     solids["main_board"] = (mb_solid, C_PCB_GRN)
 
     # 3. ui_mezzanine (68.0 x 108.0 x 1.6 mm at X=[6.4,74.4], Y=[52.85,160.85], Z=[-13.2,-11.6])
@@ -419,15 +444,15 @@ def build_populated_solids() -> Dict[str, Tuple[bd.Solid, Tuple[float, float, fl
         nut = (cyl_y(cx, zc, 184.55, 187.30, 15.60) - cyl_y(cx, zc, 184.00, 188.00, 11.20)).solids()[0]
         solids[f"{jref}_nut"] = (nut, C_CHROME)
 
-    # 7b. 2x Same Sky SJ1-3523N (including -0.50mm front Ø6.00mm collar step below F.Cu!)
+    # 7b. 2x Same Sky SJ1-3523N (including -0.50mm front Ø6.00mm collar step below F.Cu inside 0.70mm PCB relief notch!)
     for jref in ("J_MIDI_THRU", "J_MIDI_IN"):
         fp = mb_fps[jref]
         px = ox_mb + pcbnew.ToMM(fp.GetPosition().x)
-        py = oy_mb - pcbnew.ToMM(fp.GetPosition().y)  # Pin 1 (S) at Y_w = 178.30
+        py = oy_mb - pcbnew.ToMM(fp.GetPosition().y)  # Pin 1 (S) at Y_w = 178.00 (Y_pcb = 3.60 -> 0.50mm NPTH web)
         zc = nc[jref]["z_center"]                     # -35.90
-        # Main housing: py - 7.70 .. py + 3.50 (170.60 .. 181.80), Z = F.Cu+0.02 .. F.Cu+5.00
+        # Main housing: py - 7.70 .. py + 3.50 (170.30 .. 181.50), Z = F.Cu+0.02 .. F.Cu+5.00
         sjb = box_xyz(px - 6.00, px + 6.00, py - 7.70, py + 3.50, Z_MAIN_FCU + 0.02, Z_MAIN_FCU + 5.00)
-        # Front Ø6.00mm collar: py + 3.50 .. py + 6.50 (181.80 .. 184.80 -> 0.20mm North of PCB North edge 181.60!)
+        # Front Ø6.00mm collar: py + 3.50 .. py + 6.50 (181.50 .. 184.50, clearing Y=[180.90, 181.60] Edge.Cuts notch!)
         # Reaches Z = -35.90 - 3.00 = -38.90 (0.50mm below Z_MAIN_FCU!)
         sjc = cyl_y(px, zc, py + 3.50, py + 6.50, 6.00)
         solids[jref] = ((sjb + sjc).solids()[0], C_BLACK)
@@ -605,7 +630,8 @@ def build_populated_solids() -> Dict[str, Tuple[bd.Solid, Tuple[float, float, fl
     for kref in ("K1", "K2"):
         fp = mb_fps[kref]
         kx, ky = ox_mb + pcbnew.ToMM(fp.GetPosition().x), oy_mb - pcbnew.ToMM(fp.GetPosition().y)
-        solids[kref] = (box_xyz(kx - 5.0, kx + 5.0, ky - 3.25, ky + 3.25,
+        # Relay_DPDT_Omron_G6K-2F-Y at rot=0 deg is 6.50mm (X) x 10.00mm (Y) x 5.20mm (Z)
+        solids[kref] = (box_xyz(kx - 3.25, kx + 3.25, ky - 5.00, ky + 5.00,
                                 Z_MAIN_FCU + 0.02, Z_MAIN_FCU + 5.20), C_BLACK)
     opto_pads = [(ox_mb + pcbnew.ToMM(p.GetPosition().x), oy_mb - pcbnew.ToMM(p.GetPosition().y))
                  for p in mb_fps["U_OPTO"].Pads()]
@@ -613,6 +639,61 @@ def build_populated_solids() -> Dict[str, Tuple[bd.Solid, Tuple[float, float, fl
     opy = (min(y for _, y in opto_pads) + max(y for _, y in opto_pads)) / 2.0
     solids["U_OPTO_H11L1"] = (box_xyz(opx - 3.30, opx + 3.30, opy - 3.80, opy + 3.80,
                                       Z_MAIN_FCU + 0.02, Z_MAIN_FCU + 7.50), C_BLACK)
+
+    # 11b. All remaining 296 SMD packages & passives on main_board (derived from exact KiCad PCB_SHAPE F.Fab centerlines!)
+    smd_heights_mm: Dict[str, float] = {
+        "Resistor_SMD:R_0603_1608Metric": 0.55,
+        "Resistor_SMD:R_0805_2012Metric": 0.60,
+        "Capacitor_SMD:C_0603_1608Metric": 0.80,
+        "Capacitor_SMD:C_0805_2012Metric": 1.25,
+        "Capacitor_SMD:C_1206_3216Metric": 1.60,
+        "Inductor_SMD:L_0603_1608Metric": 0.80,
+        "Fuse:Fuse_1206_3216Metric": 1.10,
+        "Fuse:Fuse_1812_4532Metric": 1.20,
+        "Diode_SMD:D_SOD-323": 1.00,
+        "Diode_SMD:D_SOD-123": 1.20,
+        "Diode_SMD:D_SMA": 2.20,
+        "Diode_SMD:D_SMB": 2.40,
+        "Crystal:Crystal_SMD_3225-4Pin_3.2x2.5mm": 0.80,
+        "Package_TO_SOT_SMD:SOT-23": 1.10,
+        "Package_TO_SOT_SMD:SOT-23-6": 1.25,
+        "Package_TO_SOT_SMD:SOT-223-3_TabPin2": 1.70,
+        "Package_TO_SOT_SMD:TO-252-2": 2.30,
+        "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm": 1.65,
+        "Package_SO:SOIC-8_5.3x5.3mm_P1.27mm": 1.90,
+        "Package_SO:SOIC-14_3.9x8.7mm_P1.27mm": 1.65,
+        "Package_SO:TSSOP-20_4.4x6.5mm_P0.65mm": 1.15,
+        "beads_custom:SOIC-8-1EP_TPS5430_SegPaste": 1.65,
+        "beads_custom:SOP-4_TLP172AM_P2.54mm": 2.10,
+        "beads_custom:QFN-56-1EP_7x7mm_RP2040_SegPaste": 0.90,
+        "beads_custom:VQFN-24-1EP_4x4mm_TPS65131_SegPaste": 0.90,
+        "beads_custom:SW_Push_TS-1088_4.0x3.0mm": 2.00,
+    }
+    C_PASSIVE = (0.48, 0.40, 0.28)
+    for fp in mb_board.GetFootprints():
+        ref = fp.GetReference()
+        fpid = fp.GetFPIDAsString()
+        if (
+            ref in solids
+            or f"{ref}_header" in solids
+            or ref in ("U_OPTO", "J_BTB_AUDIO_CV", "J_BTB_UI_DIG")
+            or ref.startswith(("MH", "TP"))
+        ):
+            continue
+        assert fpid in smd_heights_mm, f"Unhandled SMD footprint on main_board: {ref} ({fpid})"
+        fxs: List[float] = []
+        fys: List[float] = []
+        for item in fp.GraphicalItems():
+            if item.GetLayer() == pcbnew.F_Fab and isinstance(item, pcbnew.PCB_SHAPE):
+                bb = item.GetBoundingBox()
+                hw = item.GetWidth() // 2
+                fxs.extend([ox_mb + pcbnew.ToMM(bb.GetLeft() + hw), ox_mb + pcbnew.ToMM(bb.GetRight() - hw)])
+                fys.extend([oy_mb - pcbnew.ToMM(bb.GetBottom() - hw), oy_mb - pcbnew.ToMM(bb.GetTop() + hw)])
+        col_smd = C_PASSIVE if ref.startswith(("R", "C", "FB", "F")) else C_BLACK
+        solids[ref] = (
+            box_xyz(min(fxs), max(fxs), min(fys), max(fys), Z_MAIN_FCU + 0.02, Z_MAIN_FCU + smd_heights_mm[fpid]),
+            col_smd,
+        )
 
     # 12. All 18x M3 Brass Heat-Set Inserts (OD=4.60mm, ID=3.06mm, L=4.00mm) + All 18x M3 Bolts!
     def add_brass_insert(name: str, cx: float, cy: float, z1: float, z2: float) -> None:
@@ -639,14 +720,15 @@ def build_populated_solids() -> Dict[str, Tuple[bd.Solid, Tuple[float, float, fl
         ).solids()[0]
         solids[bname] = (bolt, C_CHROME)
 
-    # 12c. 6x main_board Inserts (MH101..106) + 3x M3x5mm Low-Head PCB Screws + 3x M3x10mm North Lid/PCB Screws
+    # 12c. 6x main_board Inserts (MH101..106) + 3x M3x5mm ISO 7380 Button-Head Screws + 3x M3x10mm North Lid/PCB Screws
     mhs_map = {m["ref"]: (m["x"], m["y"]) for m in CONTRACT["boards"]["main_board"]["mounting_holes_world_mm"]}
     for mref in ("MH101", "MH102", "MH103"):
         mx, my = mhs_map[mref]
         add_brass_insert(f"INS_{mref}", mx, my, Z_MAIN_FCU + 0.02, Z_MAIN_FCU + 4.02)
-        # Low-profile M3x5mm screw (1.4mm head at Z=[-41.42, -40.02], clearing Z=-42.00 bottom_lid by 0.58mm!)
+        # ISO 7380-1 M3x5mm button-head screw (worst-case k_max=1.65mm, dk_max=5.70mm at Z=[-41.67, -40.02],
+        # clearing Z_LID_TOP=-42.00mm bottom_lid by 0.33mm! DIN 9200 k<=1.40mm clears by 0.58mm.)
         bolt = (
-            cyl_z(mx, my, Z_MAIN_BCU - 1.42, Z_MAIN_BCU - 0.02, 5.40)
+            cyl_z(mx, my, Z_MAIN_BCU - 1.67, Z_MAIN_BCU - 0.02, 5.70)
             + cyl_z(mx, my, Z_MAIN_BCU - 0.02, Z_MAIN_FCU + 3.80, 2.98)
         ).solids()[0]
         solids[f"BOLT_{mref}"] = (bolt, C_CHROME)
@@ -1009,7 +1091,7 @@ def render_cross_section_and_wiring_diagrams(out_dir: pathlib.Path) -> None:
     # North wall connectors
     n_labels = [
         (15.5, "OUT R", -20), (35.5, "OUT L/M", -28), (55.5, "IN R", -14), (75.5, "IN L/M", -22),
-        (93.0, "THRU", -18), (105.0, "A|B", -12), (117.0, "IN", -8), (129.5, "USB-C", -24), (140.4, "DC", -8),
+        (93.0, "THRU", -18), (105.0, "<A|B>", -18), (117.0, "IN", -8), (129.5, "USB-C", -24), (140.4, "DC", -8),
     ]
     for nx, nl, dx_lbl in n_labels:
         px, py = xy(nx, 183.8)
@@ -1077,10 +1159,10 @@ def render_cross_section_and_wiring_diagrams(out_dir: pathlib.Path) -> None:
             "• FS2 (Right, X=122mm): E-Switch FS5700SPMT2B2M1QEH (EG5495-ND) -> J_FS2.",
             "• Apron 3mm LEDs: Pin 1 = Anode (+3V3), Pin 2 = Cathode -> J_LED_FS1/2.",
         ]),
-        ("5. 18x M3 BRASS HEAT-SET INSERTS (M3 x L4.0 x OD4.6 mm @ 240°C)", (15, 23, 42), [
+        ("5. 18x M3 HEAT-SET INSERTS & FASTENERS (M3x4.0xOD4.6 @ 240°C)", (15, 23, 42), [
             "• 8x Top 3U Eurorack rail bosses (4x Left @ Z=-1.6mm, 4x Right @ Z=-2.0mm).",
-            "• 6x Internal main_board bosses MH101..103 (Y=41mm) & MH104..106 (Y=142mm).",
-            "• 4x South apron bottom-lid bosses (at Z=-42.00mm).",
+            "• 6x main_board bosses: MH101..103 use M3x5 ISO 7380 button/wafer head (k<=1.65mm)!",
+            "• 4x South lid (M3x8 DIN 7991 CSK) + 3x North MH104..106 (M3x10 DIN 7991 CSK).",
             "• Fasten faceplate & Beads with 8x M3x6mm Knurlies (dead-flush at Z=0!).",
         ]),
         ("6. HEADERLESS USB-C UF2 FIRMWARE FLASHING", (5, 150, 105), [
@@ -1114,7 +1196,7 @@ def main() -> int:
     bd.export_step(lid, str(EXPORT_DIR / "beads_bottom_lid.step"))
     print(f"      Exported STLs & STEPs -> {EXPORT_DIR}")
 
-    print("[2/4] Building full 90+ solid populated assembly STEP...")
+    print("[2/4] Building full 417-solid populated assembly STEP...")
     solids = build_populated_solids()
     assy = bd.Compound(children=[s for s, _ in solids.values()])
     bd.export_step(assy, str(EXPORT_DIR / "beads_full_assembly.step"))
@@ -1140,6 +1222,7 @@ def main() -> int:
     )
 
     # View 2: North-Wall Pedalboard I/O & Spotfaces Studio View
+    # Note: Looking South (-Y) at the North wall, +X (East) is on the viewer's LEFT and -X (West) is on the viewer's RIGHT!
     render_studio_view(
         solids,
         EXPORT_DIR / "render_north_io.png",
@@ -1147,11 +1230,11 @@ def main() -> int:
         look_at=(76.0, 150.0, -24.0),
         fov_deg=28.0,
         title="NORTH-WALL PEDALBOARD I/O — ALL CABLES EXIT TOP EDGE",
-        subtitle="4x Neutrik NMJ4HCD2 1/4\" (Ø16.5mm Spotfaces) | TRS MIDI IN + Type A/B Switch + Hardware THRU | Isolated USB-C | 9-18V DC",
+        subtitle="4x Neutrik NMJ4HCD2 1/4\" (Ø16.5mm Spotfaces) | TRS MIDI IN + Debossed B<->A Switch + Hardware THRU | Isolated USB-C | 9-18V DC",
         callouts=[
-            ((15.5, 186.5, -30.26), (1150, 860), "OUT R & OUT L/M (Neutrik NMJ4HCD2)"),
-            ((75.5, 186.5, -30.26), (760, 920), "IN R (L->R Normalled) & IN L/Mono"),
-            ((105.0, 185.6, -36.50), (430, 900), "MIDI THRU | TYPE A<->B | TRS MIDI IN"),
+            ((15.5, 186.5, -30.26), (1135, 860), "OUT L/M & OUT R (Neutrik NMJ4HCD2)"),
+            ((75.5, 186.5, -30.26), (755, 920), "IN L/Mono & IN R (L->R Normalled)"),
+            ((105.0, 185.6, -36.50), (420, 900), "TRS MIDI IN | TYPE B<->A | MIDI THRU"),
             ((129.5, 185.6, -36.80), (110, 845), "USB-C (MIDI + Headerless UF2, <1uA Iso)"),
             ((140.4, 187.5, -28.00), (65, 620), "9-18V DC Center-Neg (Insulated D-Bore)"),
         ],

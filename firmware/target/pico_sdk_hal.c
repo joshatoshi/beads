@@ -22,6 +22,7 @@
 #include "hardware/structs/usb.h"
 #include <string.h>
 
+_Static_assert(PICO_FLASH_SIZE_BYTES == 16777216u, "Board carries 16 MB W25Q128JVSIQ QSPI Flash");
 #define FLASH_SLOT_A_OFF (PICO_FLASH_SIZE_BYTES - 8192u)
 #define FLASH_SLOT_B_OFF (PICO_FLASH_SIZE_BYTES - 4096u)
 
@@ -283,10 +284,10 @@ void hal_usb_init_on_core1(void) {
     usb_hw->main_ctrl = USB_MAIN_CTRL_CONTROLLER_EN_BITS;
     usb_hw->sie_ctrl  = USB_SIE_CTRL_EP0_INT_1BUF_BITS;
 
-    usb_dpram->ep_ctrl[0].out = EP_CTRL_ENABLE_BITS | (2u << EP_CTRL_BUFFER_TYPE_LSB) | 0x0180u; /* EP1 OUT */
-    usb_dpram->ep_ctrl[1].in  = EP_CTRL_ENABLE_BITS | (3u << EP_CTRL_BUFFER_TYPE_LSB) | 0x0200u; /* EP2 IN  */
-    usb_dpram->ep_ctrl[2].out = EP_CTRL_ENABLE_BITS | (2u << EP_CTRL_BUFFER_TYPE_LSB) | 0x0240u; /* EP3 OUT */
-    usb_dpram->ep_ctrl[2].in  = EP_CTRL_ENABLE_BITS | (2u << EP_CTRL_BUFFER_TYPE_LSB) | 0x0280u; /* EP3 IN  */
+    usb_dpram->ep_ctrl[0].out = EP_CTRL_ENABLE_BITS | EP_CTRL_INTERRUPT_PER_BUFFER | (2u << EP_CTRL_BUFFER_TYPE_LSB) | 0x0180u; /* EP1 OUT */
+    usb_dpram->ep_ctrl[1].in  = EP_CTRL_ENABLE_BITS | EP_CTRL_INTERRUPT_PER_BUFFER | (3u << EP_CTRL_BUFFER_TYPE_LSB) | 0x0200u; /* EP2 IN  */
+    usb_dpram->ep_ctrl[2].out = EP_CTRL_ENABLE_BITS | EP_CTRL_INTERRUPT_PER_BUFFER | (2u << EP_CTRL_BUFFER_TYPE_LSB) | 0x0240u; /* EP3 OUT */
+    usb_dpram->ep_ctrl[2].in  = EP_CTRL_ENABLE_BITS | EP_CTRL_INTERRUPT_PER_BUFFER | (2u << EP_CTRL_BUFFER_TYPE_LSB) | 0x0280u; /* EP3 IN  */
     sdk_ep1_out_arm(0u);
     sdk_ep3_out_arm(0u);
 
@@ -304,17 +305,10 @@ void hal_usb_task_on_core1(void) {
         sdk_ep1_out_arm(0u);
         sdk_ep3_out_arm(0u);
     }
-    if ((sie & USB_SIE_STATUS_SETUP_REC_BITS) != 0u) {
-        usb_hw->sie_status = USB_SIE_STATUS_SETUP_REC_BITS;
-        uint8_t setup[8];
-        for (uint8_t i = 0u; i < 8u; i++) {
-            setup[i] = usb_dpram->setup_packet[i];
-        }
-        usb_ep0_handle_setup(&s_ep0, setup, &SDK_USB_EP0_HW);
-    }
-
     uint32_t bstat = usb_hw->buf_status;
     if (bstat != 0u) {
+        /* Service buf_status BEFORE SETUP_REC so a prior EP0_IN completion
+         * never overwrites a newly armed SETUP response! */
         if ((bstat & (1u << 0u)) != 0u) {
             usb_hw->buf_status = (1u << 0u);
             usb_ep0_on_in_complete(&s_ep0, &SDK_USB_EP0_HW);
@@ -352,6 +346,16 @@ void hal_usb_task_on_core1(void) {
         if (rest != 0u) {
             usb_hw->buf_status = rest;
         }
+    }
+
+    sie = usb_hw->sie_status;
+    if ((sie & USB_SIE_STATUS_SETUP_REC_BITS) != 0u) {
+        usb_hw->sie_status = USB_SIE_STATUS_SETUP_REC_BITS;
+        uint8_t setup[8];
+        for (uint8_t i = 0u; i < 8u; i++) {
+            setup[i] = usb_dpram->setup_packet[i];
+        }
+        usb_ep0_handle_setup(&s_ep0, setup, &SDK_USB_EP0_HW);
     }
 }
 

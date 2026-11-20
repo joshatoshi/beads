@@ -414,14 +414,14 @@ def build_main_board() -> None:
         placed.add(jref)
 
     # 2x Same Sky SJ1-3523N (MIDI THRU, MIDI IN):
-    # At rot=0, S=(0,0), T=(+5,-5), R=(-5,-5), front shoulder Y=+3.30, rear Y=-7.70.
-    # Rotate 180 so front shoulder (+Y_local) faces North (-Y_pcb = 0.0 -> Y_w=181.60) and body extends South (+Y_pcb)!
+    # At rot=0, S=(0,0), T=(+5,-5), R=(-5,-5), Connector Edge Y=+3.50 (+-0.30), front Ø1.2mm NPTH pegs at Y=+2.50.
+    # Rotate 180 and place at Y_pcb=3.60 -> NPTH pegs at Y_pcb=1.10 (0.500mm FR4 web to North Edge.Cuts!)
+    # paired with 0.70mm deep Edge.Cuts collar relief notches (X=x_c+-3.40mm, Y=0.00..0.70mm) per plan/04 §4.2!
     for jref in ["J_MIDI_THRU", "J_MIDI_IN"]:
         fp = by_ref[jref]
         tx = nc[jref]["x_center"] - ox_mb
         fp.SetOrientationDegrees(180.0)
-        # At rot=180, front shoulder is at fp_y - 3.30 -> set fp_y = 3.30 so front shoulder sits at Y_pcb=0.00!
-        fp.SetPosition(pt(tx, 3.30))
+        fp.SetPosition(pt(tx, 3.60))
         placed.add(jref)
 
     # C&K JS202011AQN DPDT MIDI TYPE A/B Switch:
