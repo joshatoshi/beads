@@ -35,6 +35,59 @@ def normalize_sch_text(txt: str) -> str:
     return txt
 
 
+def sync_child_sheet_instances(sch_path: pathlib.Path, txt: str) -> str:
+    """Ensure Konnect-added symbols on child sheets carry the parent project's hierarchical instance path."""
+    stem = sch_path.stem
+    parent_dir = sch_path.parent
+    root_sch = parent_dir / f"{parent_dir.name}.kicad_sch"
+    if not root_sch.exists() or root_sch.resolve() == sch_path.resolve():
+        return txt
+    root_txt = root_sch.read_text(encoding="utf-8")
+    m_root = re.search(r'\(uuid\s+"([^"]+)"\)', root_txt)
+    if not m_root:
+        return txt
+    root_uuid = m_root.group(1)
+    # Find the sheet block in root_sch referencing sch_path.name
+    sheet_uuid = None
+    for m_sh in re.finditer(r'\(sheet\s+\(at\b.*?\(uuid\s+"([^"]+)"\).*?\)', root_txt, re.S):
+        blk = m_sh.group(0)
+        if f'"{sch_path.name}"' in blk:
+            sheet_uuid = m_sh.group(1)
+            break
+    if not sheet_uuid:
+        # Fallback: locate property "Sheetfile" "<name>" and nearest preceding/following (uuid "...")
+        idx = root_txt.find(f'"{sch_path.name}"')
+        if idx >= 0:
+            s_start = root_txt.rfind("(sheet", 0, idx)
+            m_u = re.search(r'\(uuid\s+"([^"]+)"\)', root_txt[s_start:idx + 400])
+            if m_u:
+                sheet_uuid = m_u.group(1)
+    if not sheet_uuid:
+        return txt
+
+    root_proj = root_sch.stem
+    pat = re.compile(
+        r'\(project\s+"' + re.escape(stem) + r'"\s*\n([ \t]*)\(path\s+"([^"]+)"\s*\n'
+        r'([ \t]*)\(reference\s+"([^"]+)"\)\s*\n([ \t]*)\(unit\s+(\d+)\)\)\)',
+        re.M,
+    )
+
+    def repl(m: re.Match[str]) -> str:
+        ind_p, child_path, ind_r, ref, ind_u, unit = m.groups()
+        hier_path = f"/{root_uuid}/{sheet_uuid}"
+        return (
+            f'(project "{root_proj}"\n'
+            f'{ind_p}(path "{child_path}"\n'
+            f'{ind_r}(reference "{ref}")\n'
+            f'{ind_u}(unit {unit}))\n'
+            f'{ind_p}(path "{hier_path}"\n'
+            f'{ind_r}(reference "{ref}")\n'
+            f'{ind_u}(unit {unit})))'
+        )
+
+    return pat.sub(repl, txt)
+
+
 def main(argv: list[str]) -> int:
     root = pathlib.Path(__file__).resolve().parents[1]
     targets = [pathlib.Path(a) for a in argv[1:]] if len(argv) > 1 else sorted(
@@ -43,7 +96,7 @@ def main(argv: list[str]) -> int:
     changed = 0
     for p in targets:
         raw = p.read_text(encoding="utf-8")
-        fixed = normalize_sch_text(raw)
+        fixed = sync_child_sheet_instances(p, normalize_sch_text(raw))
         if fixed != raw:
             p.write_text(fixed, encoding="utf-8")
             changed += 1

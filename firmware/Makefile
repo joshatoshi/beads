@@ -11,7 +11,15 @@ CORE_SRCS   := src/bypass_sequencer.c \
                src/presets.c \
                src/cv_engine.c \
                src/oled_ui.c \
+               src/usb_ep0.c \
                src/main.c
+
+CORE0_RT_OBJS := $(BUILD_DIR)/target/src/bypass_sequencer.o \
+                 $(BUILD_DIR)/target/src/bezier_drift.o \
+                 $(BUILD_DIR)/target/src/dac_mcp4822.o \
+                 $(BUILD_DIR)/target/src/midi_router.o \
+                 $(BUILD_DIR)/target/src/cv_engine.o \
+                 $(BUILD_DIR)/target/src/main.o
 
 TARGET_SRCS := $(CORE_SRCS) target/rp2040_startup.c target/rp2040_hal.c
 TARGET_OBJS := $(patsubst %.c,$(BUILD_DIR)/target/%.o,$(TARGET_SRCS))
@@ -40,13 +48,16 @@ $(BUILD_DIR)/beads_bridge.elf: $(TARGET_OBJS) target/rp2040.ld
 $(BUILD_DIR)/beads_bridge.uf2: $(BUILD_DIR)/beads_bridge.elf tools/elf2uf2.py
 	python3 tools/elf2uf2.py $< $@
 
-# Gate: verify ZERO 64-bit divmod or software float helpers in Core 0 2kHz tick & entire ELF!
+# Gate: verify ZERO 64-bit/float soft-helpers in entire ELF AND ZERO 32-bit soft-division in Core 0 2kHz RT objects!
 check_symbols: $(BUILD_DIR)/beads_bridge.elf
-	@echo "[CHECK] Verifying zero 64-bit/float soft-helpers in RP2040 ELF..."
+	@echo "[CHECK] Verifying zero 64-bit/float helpers in ELF and zero soft-division in Core 0 2kHz objects..."
 	@if $(ARM_NM) -u $(BUILD_DIR)/beads_bridge.elf $(BUILD_DIR)/target/src/*.o | grep -E '__aeabi_(uldivmod|ldivmod|fadd|fsub|fmul|fdiv|dadd|dsub|dmul|ddiv|i2f|f2iz|ui2f|d2iz)'; then \
-	  echo "[FAIL] Forbidden 64-bit/float helper detected in Core 0 / firmware objects!"; exit 1; \
+	  echo "[FAIL] Forbidden 64-bit/float helper detected in firmware objects!"; exit 1; \
 	fi
-	@echo "[PASS] Zero 64-bit/float helpers in RP2040 target objects & ELF!"
+	@if $(ARM_NM) -u $(CORE0_RT_OBJS) | grep -E '__aeabi_(uidiv|idiv|uidivmod|idivmod)'; then \
+	  echo "[FAIL] Forbidden 32-bit software division helper detected in Core 0 2kHz real-time objects!"; exit 1; \
+	fi
+	@echo "[PASS] Zero 64-bit/float helpers in ELF and zero __aeabi_(u)idiv(mod) in Core 0 2kHz RT objects!"
 
 # Gate: verify every compiled target function's stack frame fits comfortably inside PICO_CORE1_STACK_SIZE (4096 B)!
 check_stack: $(BUILD_DIR)/beads_bridge.elf

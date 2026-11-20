@@ -384,6 +384,14 @@
       {
         "netclass": "POWER_QFN",
         "pattern": "PMIC_SWN"
+      },
+      {
+        "netclass": "POWER_QFN",
+        "pattern": "+14V6_RAW"
+      },
+      {
+        "netclass": "POWER_QFN",
+        "pattern": "-14V6_RAW"
       }
     ]
   },

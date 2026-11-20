@@ -1,1306 +1,927 @@
 (kicad_sch
-	(version 20250114)
-	(generator "eeschema")
-	(generator_version "9.0")
-	(uuid ea7f6187-aca8-4dbd-9d73-05934d47dbbc)
-	(paper "A4")
-	(lib_symbols
-		(symbol "Mechanical:MountingHole"
-			(pin_names
-				(offset 1.016)
-			)
-			(exclude_from_sim no)
-			(in_bom no)
-			(on_board yes)
-			(property "Reference" "H"
-				(at 0 5.08 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "MountingHole"
-				(at 0 3.175 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" ""
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Datasheet" "~"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Description" "Mounting Hole without connection"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "ki_keywords" "mounting hole"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "ki_fp_filters" "MountingHole*"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(symbol "MountingHole_0_1"
-				(circle
-					(center 0 0)
-					(radius 1.27)
-					(stroke
-						(width 1.27)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
-		(symbol "power:PWR_FLAG"
-			(power)
-			(pin_numbers
-				(hide yes)
-			)
-			(pin_names
-				(offset 0)
-				(hide yes)
-			)
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(property "Reference" "#FLG"
-				(at 0 1.905 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Value" "PWR_FLAG"
-				(at 0 3.81 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" ""
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Datasheet" "~"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Description" "Special symbol for telling ERC where power comes from"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "ki_keywords" "flag power"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(symbol "PWR_FLAG_0_0"
-				(pin power_out line
-					(at 0 0 90)
-					(length 0)
-					(name "~"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(symbol "PWR_FLAG_0_1"
-				(polyline
-					(pts
-						(xy 0 0) (xy 0 1.27) (xy -1.016 1.905) (xy 0 2.54) (xy 1.016 1.905) (xy 0 1.27)
-					)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
-	)
-	(sheet
-		(at 150.0 50.0)
-		(size 90.0 45.0)
-		(fields_autoplaced yes)
-		(stroke
-			(width 0.0006)
-			(type default)
-		)
-		(fill
-			(color 0 0 0 0.0)
-		)
-		(uuid "5a8723ff-5a8d-4cbf-b0ac-a2364667b9a9")
-		(property "Sheet name" "02_Audio_Popless_Bypass_Preamp_Env"
-			(at 152.54 48.73 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left bottom)
-			)
-		)
-		(property "Sheet file" "02_audio_bypass_preamp.kicad_sch"
-			(at 152.54 96.27 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left bottom)
-			)
-		)
-	)
-	(sheet
-		(at 40.0 115.0)
-		(size 90.0 45.0)
-		(fields_autoplaced yes)
-		(stroke
-			(width 0.0006)
-			(type default)
-		)
-		(fill
-			(color 0 0 0 0.0)
-		)
-		(uuid "8d7dee6e-5dfd-4bbe-9d61-f7828951365f")
-		(property "Sheet name" "03_CV_DACs_Bipolar_Drivers"
-			(at 42.54 113.73 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left bottom)
-			)
-		)
-		(property "Sheet file" "03_cv_dacs_drivers.kicad_sch"
-			(at 42.54 161.27 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left bottom)
-			)
-		)
-	)
-	(sheet
-		(at 150.0 115.0)
-		(size 90.0 45.0)
-		(fields_autoplaced yes)
-		(stroke
-			(width 0.0006)
-			(type default)
-		)
-		(fill
-			(color 0 0 0 0.0)
-		)
-		(uuid "a6ccc6f0-d544-4716-83de-e24bc0f19f85")
-		(property "Sheet name" "04_RP2040_MIDI_Thru_BTB_Headers"
-			(at 152.54 113.73 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left bottom)
-			)
-		)
-		(property "Sheet file" "04_mcu_midi_btb.kicad_sch"
-			(at 152.54 161.27 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left bottom)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Mechanical:MountingHole")
-		(at 39.37 180.34 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "2e8d587e-3d77-4cb7-915a-c89194afc6d9")
-		(property "Reference" "MH101"
-			(at 39.37 177.8 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "M3_Floor_SW"
-			(at 39.37 182.88 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
-			(at 39.37 180.34 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 39.37 180.34 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Mounting Hole without connection"
-			(at 39.37 180.34 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(instances
-			(project "main_board"
-				(path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
-					(reference "MH101")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Mechanical:MountingHole")
-		(at 69.85 180.34 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "5af397e2-8234-481e-aae3-c255c4ce57a3")
-		(property "Reference" "MH102"
-			(at 69.85 177.8 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "M3_Floor_SC"
-			(at 69.85 182.88 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
-			(at 69.85 180.34 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 69.85 180.34 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Mounting Hole without connection"
-			(at 69.85 180.34 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(instances
-			(project "main_board"
-				(path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
-					(reference "MH102")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Mechanical:MountingHole")
-		(at 100.33 180.34 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "145b8002-3b37-4f60-a307-7e5d1701246c")
-		(property "Reference" "MH103"
-			(at 100.33 177.8 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "M3_Floor_SE"
-			(at 100.33 182.88 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
-			(at 100.33 180.34 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 100.33 180.34 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Mounting Hole without connection"
-			(at 100.33 180.34 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(instances
-			(project "main_board"
-				(path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
-					(reference "MH103")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Mechanical:MountingHole")
-		(at 129.54 180.34 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "f81a6b80-b961-4e6a-987f-23ee3e90c986")
-		(property "Reference" "MH104"
-			(at 129.54 177.8 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "M3_Floor_NW"
-			(at 129.54 182.88 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
-			(at 129.54 180.34 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 129.54 180.34 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Mounting Hole without connection"
-			(at 129.54 180.34 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(instances
-			(project "main_board"
-				(path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
-					(reference "MH104")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Mechanical:MountingHole")
-		(at 160.02 180.34 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "2aca7c34-0754-43cc-9b7d-6b83ab591360")
-		(property "Reference" "MH105"
-			(at 160.02 177.8 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "M3_Floor_NC"
-			(at 160.02 182.88 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
-			(at 160.02 180.34 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 160.02 180.34 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Mounting Hole without connection"
-			(at 160.02 180.34 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(instances
-			(project "main_board"
-				(path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
-					(reference "MH105")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Mechanical:MountingHole")
-		(at 190.5 180.34 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "1b377555-4c32-48a7-8bcd-9f56b40fff3d")
-		(property "Reference" "MH106"
-			(at 190.5 177.8 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "M3_Floor_NE"
-			(at 190.5 182.88 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
-			(at 190.5 180.34 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 190.5 180.34 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Mounting Hole without connection"
-			(at 190.5 180.34 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(instances
-			(project "main_board"
-				(path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
-					(reference "MH106")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:PWR_FLAG")
-		(at 39.37 204.47 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "bd9ce9f9-0c5a-4a0f-8415-05aa84981386")
-		(property "Reference" "#FLG1"
-			(at 39.37 201.93 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "PWR_FLAG"
-			(at 39.37 207.01 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 39.37 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 39.37 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Special symbol for telling ERC where power comes from"
-			(at 39.37 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "a75efe13-27dd-4f4e-b446-a6a8fc9bd1d7")
-		)
-		(instances
-			(project "main_board"
-				(path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
-					(reference "#FLG1")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:PWR_FLAG")
-		(at 63.5 204.47 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "ad48940b-334e-4746-9d57-fe3a4e6b848c")
-		(property "Reference" "#FLG2"
-			(at 63.5 201.93 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "PWR_FLAG"
-			(at 63.5 207.01 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 63.5 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 63.5 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Special symbol for telling ERC where power comes from"
-			(at 63.5 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "1fc9aef1-f907-4c58-8c60-bd2a66be192d")
-		)
-		(instances
-			(project "main_board"
-				(path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
-					(reference "#FLG2")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:PWR_FLAG")
-		(at 87.63 204.47 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "db73f70a-aab6-486a-8611-2802463fa19f")
-		(property "Reference" "#FLG3"
-			(at 87.63 201.93 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "PWR_FLAG"
-			(at 87.63 207.01 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 87.63 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 87.63 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Special symbol for telling ERC where power comes from"
-			(at 87.63 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "1852bfda-a5cf-4448-ace5-edcf91bca6e4")
-		)
-		(instances
-			(project "main_board"
-				(path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
-					(reference "#FLG3")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:PWR_FLAG")
-		(at 111.76 204.47 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "8ddbed25-2c13-4736-aa74-1f234973cd9f")
-		(property "Reference" "#FLG4"
-			(at 111.76 201.93 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "PWR_FLAG"
-			(at 111.76 207.01 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 111.76 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 111.76 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Special symbol for telling ERC where power comes from"
-			(at 111.76 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "2cefed88-0665-4640-ac60-b3b68bdc1abf")
-		)
-		(instances
-			(project "main_board"
-				(path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
-					(reference "#FLG4")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:PWR_FLAG")
-		(at 135.89 204.47 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "39cfb549-bdf0-404d-8542-1ce3ceafc8e1")
-		(property "Reference" "#FLG5"
-			(at 135.89 201.93 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "PWR_FLAG"
-			(at 135.89 207.01 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 135.89 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 135.89 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Special symbol for telling ERC where power comes from"
-			(at 135.89 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "f9b19cb9-bec0-4fe0-bfb9-4fad9ef2e0d5")
-		)
-		(instances
-			(project "main_board"
-				(path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
-					(reference "#FLG5")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:PWR_FLAG")
-		(at 160.02 204.47 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "3d19b6bf-be37-4dfd-9fdb-93d7cae90f52")
-		(property "Reference" "#FLG6"
-			(at 160.02 201.93 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "PWR_FLAG"
-			(at 160.02 207.01 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 160.02 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 160.02 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Special symbol for telling ERC where power comes from"
-			(at 160.02 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "70f6e6dd-5c96-490d-a31c-cbef0f5a811c")
-		)
-		(instances
-			(project "main_board"
-				(path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
-					(reference "#FLG6")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:PWR_FLAG")
-		(at 184.15 204.47 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "9d4f096c-a965-437e-81f7-26ed421de1be")
-		(property "Reference" "#FLG7"
-			(at 184.15 201.93 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "PWR_FLAG"
-			(at 184.15 207.01 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 184.15 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 184.15 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Special symbol for telling ERC where power comes from"
-			(at 184.15 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "3158b10b-529a-40d0-be93-42cd94ee0723")
-		)
-		(instances
-			(project "main_board"
-				(path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
-					(reference "#FLG7")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:PWR_FLAG")
-		(at 232.41 204.47 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "8f1a66c9-b0a1-41d8-9cb4-5d14b14baffa")
-		(property "Reference" "#FLG9"
-			(at 232.41 201.93 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "PWR_FLAG"
-			(at 232.41 207.01 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 232.41 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 232.41 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Special symbol for telling ERC where power comes from"
-			(at 232.41 204.47 0)
-			(effects
-				(hide yes)
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "67264191-9f2b-4595-b15c-62c6c3c16cb2")
-		)
-		(instances
-			(project "main_board"
-				(path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
-					(reference "#FLG9")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(global_label "GND"
-		(at 39.37 204.47 90)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "d8c564c0-1609-4543-9f22-7743923b5f26")
-	)
-	(global_label "VIN_FILT"
-		(at 63.5 204.47 90)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "b1870e11-d6cc-4ece-95f5-edd1560c655d")
-	)
-	(global_label "+5V_BUCK"
-		(at 87.63 204.47 90)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "468b6dcf-076e-4abd-8fe3-af6b4835320f")
-	)
-	(global_label "+13V9_RAW"
-		(at 111.76 204.47 90)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "e1e85a16-3bd0-4f6a-aa89-4d891a9fe605")
-	)
-	(global_label "-13V7_RAW"
-		(at 135.89 204.47 90)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "2516019e-0364-4eab-8260-e5c3f8360060")
-	)
-	(global_label "+12V_EUR"
-		(at 160.02 204.47 90)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "82671cde-2bf4-4068-9bb8-05ca982f13f1")
-	)
-	(global_label "-12V_EUR"
-		(at 184.15 204.47 90)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "13846360-4f32-41e9-83ab-43b3eecb3797")
-	)
-	(global_label "VIN_3V3_LDO"
-		(at 232.41 204.47 90)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "6a18c392-4d65-4bb0-9359-4368d79170b8")
-	)
-	(text "BEADS PEDALBOARD SKIFF - MAIN FLOOR PCB (142.0 x 146.6 mm, 2-Layer 1.6mm FR4)\\n9-18V DC Center-Negative -> +5.08V -> +-13.8V -> Linear +-12.0V Eurorack + Zero-Backfeed USB-C\\nStereo Popless Relay+PhotoMOS True Bypass | 1M JFET Preamp | 8x +-8.2V CV DACs | RP2040 | MIDI THRU"
-		(exclude_from_sim no)
-		(at 35 25 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "f7c282d5-84f7-477a-8a27-99017ba3d0d0")
-	)
-	(sheet
-		(at 40.0 50.0)
-		(size 90.0 45.0)
-		(fields_autoplaced yes)
-		(stroke
-			(width 0.0006)
-			(type default)
-		)
-		(fill
-			(color 0 0 0 0.0)
-		)
-		(uuid "8ab1d051-ec9f-470f-8377-2f3e5e116528")
-		(property "Sheet name" "01_Power_Protection_USB_Isolation"
-			(at 42.54 48.73 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left bottom)
-			)
-		)
-		(property "Sheet file" "01_power_protection.kicad_sch"
-			(at 42.54 96.27 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left bottom)
-			)
-		)
-	)
-	(sheet_instances
-		(path "/"
-			(page "1")
-		)
-		(path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc/dfd5330d-1e9c-4b5b-83aa-aa5fffaf28a6"
-			(page "2")
-		)
-		(path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc/5a8723ff-5a8d-4cbf-b0ac-a2364667b9a9"
-			(page "3")
-		)
-		(path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc/8d7dee6e-5dfd-4bbe-9d61-f7828951365f"
-			(page "4")
-		)
-		(path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc/a6ccc6f0-d544-4716-83de-e24bc0f19f85"
-			(page "5")
-		)
-		(path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc/8ab1d051-ec9f-470f-8377-2f3e5e116528"
-			(page "6")
-		)
-	)
+  (version 20250114)
+  (generator "eeschema")
+  (generator_version "9.0")
+  (uuid "ea7f6187-aca8-4dbd-9d73-05934d47dbbc")
+  (paper "A4")
+
+  (lib_symbols
+    (symbol "Mechanical:MountingHole"
+      (pin_names
+        (offset 1.016))
+      (exclude_from_sim no)
+      (in_bom no)
+      (on_board yes)
+      (property "Reference" "H"
+        (at 0 5.08 0)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "Value" "MountingHole"
+        (at 0 3.175 0)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "Footprint" ""
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (hide yes)))
+      (property "Datasheet" "~"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (hide yes)))
+      (property "Description" "Mounting Hole without connection"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (hide yes)))
+      (property "ki_keywords" "mounting hole"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (hide yes)))
+      (property "ki_fp_filters" "MountingHole*"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (hide yes)))
+      (symbol "MountingHole_0_1"
+        (circle
+          (center 0 0)
+          (radius 1.27)
+          (stroke
+            (width 1.27)
+            (type default))
+          (fill
+            (type none))))
+      (embedded_fonts no))
+    (symbol "power:PWR_FLAG"
+      (power)
+      (pin_numbers
+        (hide yes))
+      (pin_names
+        (offset 0)
+        (hide yes))
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "#FLG"
+        (at 0 1.905 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (hide yes)))
+      (property "Value" "PWR_FLAG"
+        (at 0 3.81 0)
+        (effects
+          (font
+            (size 1.27 1.27))))
+      (property "Footprint" ""
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (hide yes)))
+      (property "Datasheet" "~"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (hide yes)))
+      (property "Description" "Special symbol for telling ERC where power comes from"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (hide yes)))
+      (property "ki_keywords" "flag power"
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27))
+          (hide yes)))
+      (symbol "PWR_FLAG_0_0"
+        (pin power_out line
+          (at 0 0 90)
+          (length 0)
+          (name "~"
+            (effects
+              (font
+                (size 1.27 1.27))))
+          (number "1"
+            (effects
+              (font
+                (size 1.27 1.27))))))
+      (symbol "PWR_FLAG_0_1"
+        (polyline
+          (pts
+            (xy 0 0)
+            (xy 0 1.27)
+            (xy -1.016 1.905)
+            (xy 0 2.54)
+            (xy 1.016 1.905)
+            (xy 0 1.27))
+          (stroke
+            (width 0)
+            (type default))
+          (fill
+            (type none))))
+      (embedded_fonts no)))
+
+  (text "BEADS PEDALBOARD SKIFF - MAIN FLOOR PCB (142.0 x 146.6 mm, 2-Layer 1.6mm FR4)\\n9-18V DC Center-Negative -> +5.08V -> +-13.8V -> Linear +-12.0V Eurorack + Zero-Backfeed USB-C\\nStereo Popless Relay+PhotoMOS True Bypass | 1M JFET Preamp | 8x +-8.2V CV DACs | RP2040 | MIDI THRU"
+    (at 35 25 0)
+    (effects
+      (font
+        (size 1.27 1.27))
+      (justify left bottom))
+    (uuid "f7c282d5-84f7-477a-8a27-99017ba3d0d0"))
+
+  (global_label "GND"
+    (shape bidirectional)
+    (at 39.37 204.47 90)
+    (effects
+      (font
+        (size 1.27 1.27))
+      (justify left))
+    (uuid "d8c564c0-1609-4543-9f22-7743923b5f26"))
+
+  (global_label "VIN_FILT"
+    (shape bidirectional)
+    (at 63.5 204.47 90)
+    (effects
+      (font
+        (size 1.27 1.27))
+      (justify left))
+    (uuid "b1870e11-d6cc-4ece-95f5-edd1560c655d"))
+
+  (global_label "+5V_BUCK"
+    (shape bidirectional)
+    (at 87.63 204.47 90)
+    (effects
+      (font
+        (size 1.27 1.27))
+      (justify left))
+    (uuid "468b6dcf-076e-4abd-8fe3-af6b4835320f"))
+
+  (global_label "+12V_EUR"
+    (shape bidirectional)
+    (at 160.02 204.47 90)
+    (effects
+      (font
+        (size 1.27 1.27))
+      (justify left))
+    (uuid "82671cde-2bf4-4068-9bb8-05ca982f13f1"))
+
+  (global_label "-12V_EUR"
+    (shape bidirectional)
+    (at 184.15 204.47 90)
+    (effects
+      (font
+        (size 1.27 1.27))
+      (justify left))
+    (uuid "13846360-4f32-41e9-83ab-43b3eecb3797"))
+
+  (global_label "VIN_3V3_LDO"
+    (shape bidirectional)
+    (at 232.41 204.47 90)
+    (effects
+      (font
+        (size 1.27 1.27))
+      (justify left))
+    (uuid "6a18c392-4d65-4bb0-9359-4368d79170b8"))
+
+  (global_label "+14V6_RAW"
+    (shape bidirectional)
+    (at 111.76 204.47 90)
+    (effects
+      (font
+        (size 1.27 1.27))
+      (justify left))
+    (uuid "a503a92f-5e7b-46d2-a40a-f311697360f3"))
+
+  (global_label "-14V6_RAW"
+    (shape bidirectional)
+    (at 135.89 204.47 90)
+    (effects
+      (font
+        (size 1.27 1.27))
+      (justify left))
+    (uuid "e049155d-19da-4575-9147-402774168b70"))
+
+  (sheet
+    (at 150 50)
+    (size 90 45)
+    (fields_autoplaced)
+    (stroke
+      (width 0.0006)
+      (type default))
+    (fill
+      (color 0 0 0 0.0))
+    (uuid "5a8723ff-5a8d-4cbf-b0ac-a2364667b9a9")
+    (property "Sheet name" "02_Audio_Popless_Bypass_Preamp_Env"
+      (at 152.54 48.73 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left bottom)))
+    (property "Sheet file" "02_audio_bypass_preamp.kicad_sch"
+      (at 152.54 96.27 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left bottom))))
+
+  (sheet
+    (at 40 115)
+    (size 90 45)
+    (fields_autoplaced)
+    (stroke
+      (width 0.0006)
+      (type default))
+    (fill
+      (color 0 0 0 0.0))
+    (uuid "8d7dee6e-5dfd-4bbe-9d61-f7828951365f")
+    (property "Sheet name" "03_CV_DACs_Bipolar_Drivers"
+      (at 42.54 113.73 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left bottom)))
+    (property "Sheet file" "03_cv_dacs_drivers.kicad_sch"
+      (at 42.54 161.27 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left bottom))))
+
+  (sheet
+    (at 150 115)
+    (size 90 45)
+    (fields_autoplaced)
+    (stroke
+      (width 0.0006)
+      (type default))
+    (fill
+      (color 0 0 0 0.0))
+    (uuid "a6ccc6f0-d544-4716-83de-e24bc0f19f85")
+    (property "Sheet name" "04_RP2040_MIDI_Thru_BTB_Headers"
+      (at 152.54 113.73 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left bottom)))
+    (property "Sheet file" "04_mcu_midi_btb.kicad_sch"
+      (at 152.54 161.27 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left bottom))))
+
+  (sheet
+    (at 40 50)
+    (size 90 45)
+    (fields_autoplaced)
+    (stroke
+      (width 0.0006)
+      (type default))
+    (fill
+      (color 0 0 0 0.0))
+    (uuid "8ab1d051-ec9f-470f-8377-2f3e5e116528")
+    (property "Sheet name" "01_Power_Protection_USB_Isolation"
+      (at 42.54 48.73 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left bottom)))
+    (property "Sheet file" "01_power_protection.kicad_sch"
+      (at 42.54 96.27 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (justify left bottom))))
+
+  (symbol
+    (lib_id "Mechanical:MountingHole")
+    (at 39.37 180.34 0)
+    (unit 1)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "2e8d587e-3d77-4cb7-915a-c89194afc6d9")
+    (property "Reference" "MH101"
+      (at 39.37 177.8 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "M3_Floor_SW"
+      (at 39.37 182.88 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
+      (at 39.37 180.34 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Datasheet" ""
+      (at 39.37 180.34 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Description" "Mounting Hole without connection"
+      (at 39.37 180.34 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (instances
+      (project "main_board"
+        (path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
+          (reference "MH101")
+          (unit 1)))))
+
+  (symbol
+    (lib_id "Mechanical:MountingHole")
+    (at 69.85 180.34 0)
+    (unit 1)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "5af397e2-8234-481e-aae3-c255c4ce57a3")
+    (property "Reference" "MH102"
+      (at 69.85 177.8 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "M3_Floor_SC"
+      (at 69.85 182.88 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
+      (at 69.85 180.34 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Datasheet" ""
+      (at 69.85 180.34 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Description" "Mounting Hole without connection"
+      (at 69.85 180.34 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (instances
+      (project "main_board"
+        (path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
+          (reference "MH102")
+          (unit 1)))))
+
+  (symbol
+    (lib_id "Mechanical:MountingHole")
+    (at 100.33 180.34 0)
+    (unit 1)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "145b8002-3b37-4f60-a307-7e5d1701246c")
+    (property "Reference" "MH103"
+      (at 100.33 177.8 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "M3_Floor_SE"
+      (at 100.33 182.88 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
+      (at 100.33 180.34 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Datasheet" ""
+      (at 100.33 180.34 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Description" "Mounting Hole without connection"
+      (at 100.33 180.34 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (instances
+      (project "main_board"
+        (path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
+          (reference "MH103")
+          (unit 1)))))
+
+  (symbol
+    (lib_id "Mechanical:MountingHole")
+    (at 129.54 180.34 0)
+    (unit 1)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "f81a6b80-b961-4e6a-987f-23ee3e90c986")
+    (property "Reference" "MH104"
+      (at 129.54 177.8 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "M3_Floor_NW"
+      (at 129.54 182.88 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
+      (at 129.54 180.34 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Datasheet" ""
+      (at 129.54 180.34 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Description" "Mounting Hole without connection"
+      (at 129.54 180.34 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (instances
+      (project "main_board"
+        (path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
+          (reference "MH104")
+          (unit 1)))))
+
+  (symbol
+    (lib_id "Mechanical:MountingHole")
+    (at 160.02 180.34 0)
+    (unit 1)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "2aca7c34-0754-43cc-9b7d-6b83ab591360")
+    (property "Reference" "MH105"
+      (at 160.02 177.8 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "M3_Floor_NC"
+      (at 160.02 182.88 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
+      (at 160.02 180.34 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Datasheet" ""
+      (at 160.02 180.34 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Description" "Mounting Hole without connection"
+      (at 160.02 180.34 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (instances
+      (project "main_board"
+        (path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
+          (reference "MH105")
+          (unit 1)))))
+
+  (symbol
+    (lib_id "Mechanical:MountingHole")
+    (at 190.5 180.34 0)
+    (unit 1)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "1b377555-4c32-48a7-8bcd-9f56b40fff3d")
+    (property "Reference" "MH106"
+      (at 190.5 177.8 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "M3_Floor_NE"
+      (at 190.5 182.88 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
+      (at 190.5 180.34 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Datasheet" ""
+      (at 190.5 180.34 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Description" "Mounting Hole without connection"
+      (at 190.5 180.34 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (instances
+      (project "main_board"
+        (path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
+          (reference "MH106")
+          (unit 1)))))
+
+  (symbol
+    (lib_id "power:PWR_FLAG")
+    (at 39.37 204.47 0)
+    (unit 1)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "bd9ce9f9-0c5a-4a0f-8415-05aa84981386")
+    (property "Reference" "#FLG1"
+      (at 39.37 201.93 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "PWR_FLAG"
+      (at 39.37 207.01 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" ""
+      (at 39.37 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Datasheet" ""
+      (at 39.37 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Description" "Special symbol for telling ERC where power comes from"
+      (at 39.37 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (pin "1"
+      (uuid "a75efe13-27dd-4f4e-b446-a6a8fc9bd1d7"))
+    (instances
+      (project "main_board"
+        (path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
+          (reference "#FLG1")
+          (unit 1)))))
+
+  (symbol
+    (lib_id "power:PWR_FLAG")
+    (at 63.5 204.47 0)
+    (unit 1)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "ad48940b-334e-4746-9d57-fe3a4e6b848c")
+    (property "Reference" "#FLG2"
+      (at 63.5 201.93 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "PWR_FLAG"
+      (at 63.5 207.01 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" ""
+      (at 63.5 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Datasheet" ""
+      (at 63.5 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Description" "Special symbol for telling ERC where power comes from"
+      (at 63.5 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (pin "1"
+      (uuid "1fc9aef1-f907-4c58-8c60-bd2a66be192d"))
+    (instances
+      (project "main_board"
+        (path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
+          (reference "#FLG2")
+          (unit 1)))))
+
+  (symbol
+    (lib_id "power:PWR_FLAG")
+    (at 87.63 204.47 0)
+    (unit 1)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "db73f70a-aab6-486a-8611-2802463fa19f")
+    (property "Reference" "#FLG3"
+      (at 87.63 201.93 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "PWR_FLAG"
+      (at 87.63 207.01 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" ""
+      (at 87.63 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Datasheet" ""
+      (at 87.63 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Description" "Special symbol for telling ERC where power comes from"
+      (at 87.63 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (pin "1"
+      (uuid "1852bfda-a5cf-4448-ace5-edcf91bca6e4"))
+    (instances
+      (project "main_board"
+        (path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
+          (reference "#FLG3")
+          (unit 1)))))
+
+  (symbol
+    (lib_id "power:PWR_FLAG")
+    (at 111.76 204.47 0)
+    (unit 1)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "8ddbed25-2c13-4736-aa74-1f234973cd9f")
+    (property "Reference" "#FLG4"
+      (at 111.76 201.93 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "PWR_FLAG"
+      (at 111.76 207.01 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" ""
+      (at 111.76 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Datasheet" ""
+      (at 111.76 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Description" "Special symbol for telling ERC where power comes from"
+      (at 111.76 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (pin "1"
+      (uuid "2cefed88-0665-4640-ac60-b3b68bdc1abf"))
+    (instances
+      (project "main_board"
+        (path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
+          (reference "#FLG4")
+          (unit 1)))))
+
+  (symbol
+    (lib_id "power:PWR_FLAG")
+    (at 135.89 204.47 0)
+    (unit 1)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "39cfb549-bdf0-404d-8542-1ce3ceafc8e1")
+    (property "Reference" "#FLG5"
+      (at 135.89 201.93 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "PWR_FLAG"
+      (at 135.89 207.01 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" ""
+      (at 135.89 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Datasheet" ""
+      (at 135.89 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Description" "Special symbol for telling ERC where power comes from"
+      (at 135.89 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (pin "1"
+      (uuid "f9b19cb9-bec0-4fe0-bfb9-4fad9ef2e0d5"))
+    (instances
+      (project "main_board"
+        (path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
+          (reference "#FLG5")
+          (unit 1)))))
+
+  (symbol
+    (lib_id "power:PWR_FLAG")
+    (at 160.02 204.47 0)
+    (unit 1)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "3d19b6bf-be37-4dfd-9fdb-93d7cae90f52")
+    (property "Reference" "#FLG6"
+      (at 160.02 201.93 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "PWR_FLAG"
+      (at 160.02 207.01 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" ""
+      (at 160.02 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Datasheet" ""
+      (at 160.02 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Description" "Special symbol for telling ERC where power comes from"
+      (at 160.02 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (pin "1"
+      (uuid "70f6e6dd-5c96-490d-a31c-cbef0f5a811c"))
+    (instances
+      (project "main_board"
+        (path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
+          (reference "#FLG6")
+          (unit 1)))))
+
+  (symbol
+    (lib_id "power:PWR_FLAG")
+    (at 184.15 204.47 0)
+    (unit 1)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "9d4f096c-a965-437e-81f7-26ed421de1be")
+    (property "Reference" "#FLG7"
+      (at 184.15 201.93 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "PWR_FLAG"
+      (at 184.15 207.01 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" ""
+      (at 184.15 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Datasheet" ""
+      (at 184.15 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Description" "Special symbol for telling ERC where power comes from"
+      (at 184.15 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (pin "1"
+      (uuid "3158b10b-529a-40d0-be93-42cd94ee0723"))
+    (instances
+      (project "main_board"
+        (path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
+          (reference "#FLG7")
+          (unit 1)))))
+
+  (symbol
+    (lib_id "power:PWR_FLAG")
+    (at 232.41 204.47 0)
+    (unit 1)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "8f1a66c9-b0a1-41d8-9cb4-5d14b14baffa")
+    (property "Reference" "#FLG9"
+      (at 232.41 201.93 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "PWR_FLAG"
+      (at 232.41 207.01 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" ""
+      (at 232.41 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Datasheet" ""
+      (at 232.41 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (property "Description" "Special symbol for telling ERC where power comes from"
+      (at 232.41 204.47 0)
+      (effects
+        (hide yes)
+        (font
+          (size 1.27 1.27))))
+    (pin "1"
+      (uuid "67264191-9f2b-4595-b15c-62c6c3c16cb2"))
+    (instances
+      (project "main_board"
+        (path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc"
+          (reference "#FLG9")
+          (unit 1)))))
+
+  (sheet_instances
+    (path "/"
+      (page "1"))
+    (path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc/dfd5330d-1e9c-4b5b-83aa-aa5fffaf28a6"
+      (page "2"))
+    (path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc/5a8723ff-5a8d-4cbf-b0ac-a2364667b9a9"
+      (page "3"))
+    (path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc/8d7dee6e-5dfd-4bbe-9d61-f7828951365f"
+      (page "4"))
+    (path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc/a6ccc6f0-d544-4716-83de-e24bc0f19f85"
+      (page "5"))
+    (path "/ea7f6187-aca8-4dbd-9d73-05934d47dbbc/8ab1d051-ec9f-470f-8377-2f3e5e116528"
+      (page "6")))
 )

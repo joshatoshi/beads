@@ -178,25 +178,18 @@ def build_enclosure_shell(installed_inserts: bool = False) -> bd.Solid:
         mx, my = mhs[mref]
         additions.append(cyl_z(mx, my, Z_MAIN_FCU, -5.50, 8.00))
         additions.append(box_xyz(mx - 2.60, mx + 2.60, 38.60, 43.20, Z_MAIN_FCU, -15.50))
-    # MH104 (10.0, 152.0 -> fused to West wall below Z=-15.50, 2.3mm clear below ui_mezzanine B.Cu=-13.20!)
+    # MH104 (10.0, 142.0 -> fused to West wall below Z=-15.50, 2.3mm clear below ui_mezzanine B.Cu=-13.20!)
     mx4, my4 = mhs["MH104"]
     additions.append(cyl_z(mx4, my4, Z_MAIN_FCU, -15.50, 8.00))
     additions.append(box_xyz(WALL - 0.40, mx4, my4 - 3.00, my4 + 3.00, Z_MAIN_FCU, -15.50))
     additions.append(cone_z(mx4, my4, -15.50, -13.50, 4.00, 1.00))  # 45-deg top taper into West wall
-    # Settle MH104 top cleanly into West wall without touching ui_mezzanine (X>=6.4, Z>=-13.2)
-    # Wait: cone_z is below Z=-13.50, which is strictly < Z_MEZZ_BCU (-13.20)!
-    # MH105 (76.0, 152.0 -> Ø8.0mm boss below Z=-28.50, connected via X=[74.70, 78.20] spine column up to center spine!)
+
+    # MH105 (76.0, 142.0 -> relocated South so J_IN_L rear tab Y>=152.27 during dy=-6.0mm entry clears by >6.2mm!)
     mx5, my5 = mhs["MH105"]
     additions.append(cyl_z(mx5, my5, Z_MAIN_FCU, -28.50, 8.00))
-    additions.append(box_xyz(74.70, 78.20, my5 - 3.00, 163.50, Z_MAIN_FCU, -5.50))
-    # Wait: check J_IN_L (NMJ4HCD2 at cx=75.50, body_south=161.19, tab_south=158.19, Z=[-38.40, -22.20]):
-    # Keep MH105 vertical spine at Y <= 157.50 below Z=-21.50, and bridge North to North rail ABOVE Z=-21.50!
-    # Let's refine MH105 column so it stays 100% South of Y=157.50 below Z=-21.50!
-    additions.pop()  # replace with stepped L-column that clears J_IN_L by >0.7mm!
-    additions.append(box_xyz(74.70, 78.20, my5 - 3.00, 157.40, Z_MAIN_FCU, -5.50))
-    additions.append(box_xyz(74.70, 78.20, 156.50, 164.00, -21.00, -5.50))
+    additions.append(box_xyz(74.70, 78.20, my5 - 3.00, my5 + 3.50, Z_MAIN_FCU, -5.50))
 
-    # MH106 (142.0, 152.0 -> Ø8.0mm boss + East wall web below Z=-28.50, 1.5mm clear below Beads Z=-27.00!)
+    # MH106 (142.0, 142.0 -> Ø8.0mm boss + East wall web below Z=-28.50, 1.5mm clear below Beads Z=-27.00!)
     mx6, my6 = mhs["MH106"]
     additions.append(cyl_z(mx6, my6, Z_MAIN_FCU, -28.50, 8.00))
     additions.append(box_xyz(mx6, W_CASE - WALL + 0.40, my6 - 3.00, my6 + 3.00, Z_MAIN_FCU, -28.50))
@@ -242,27 +235,27 @@ def build_enclosure_shell(installed_inserts: bool = False) -> bd.Solid:
         cuts.append(cyl_y(spec["x_center"], spec["z_center"], 181.00, 186.50, spec["bore_dia"]))
         cuts.append(cyl_y(spec["x_center"], spec["z_center"], 184.50, 186.50, spec["spotface_dia"]))
 
-    # 7b. 2x Same Sky SJ1-3523N: Ø6.40mm bore + Ø10.40mm x 1.00mm exterior TRS plug-shoulder relief
+    # 7b. 2x Same Sky SJ1-3523N: Ø6.40mm bore + Ø9.80mm x 1.00mm exterior TRS plug-shoulder relief
     for jref in ("J_MIDI_THRU", "J_MIDI_IN"):
         spec = nc[jref]
         cuts.append(cyl_y(spec["x_center"], spec["z_center"], 181.00, 186.50, spec["bore_dia"]))
-        cuts.append(cyl_y(spec["x_center"], spec["z_center"], 184.60, 186.50, 10.40))
+        cuts.append(cyl_y(spec["x_center"], spec["z_center"], 184.60, 186.50, 9.80))
 
-    # 7c. C&K JS202011AQN DPDT MIDI Type A/B Switch: 5.4x3.0mm window + exterior finger bevel pocket
+    # 7c. C&K JS202011AQN DPDT MIDI Type A/B Switch: 5.4x3.0mm inner window + 11.6x6.8mm finger-reachable alcove
+    #     Actuator tip reaches Y=182.45mm (+0.15mm proud of Y=182.30mm alcove floor, 3.15mm inside Y_outer=185.60mm!)
     sws = nc["SW_MIDI_AB"]
     sw_w, sw_h = sws["window_wh"]
     cuts.append(box_xyz(sws["x_center"] - sw_w / 2.0, sws["x_center"] + sw_w / 2.0,
                         181.00, 186.50,
                         sws["z_center"] - sw_h / 2.0, sws["z_center"] + sw_h / 2.0))
-    cuts.append(box_xyz(sws["x_center"] - 4.30, sws["x_center"] + 4.30,
-                        183.40, 186.50,
-                        sws["z_center"] - 2.50, sws["z_center"] + 2.50))
+    cuts.append(oval_slot_y(sws["x_center"], sws["z_center"], 182.30, 186.50, 11.60, 6.80))
 
-    # 7d. TYPE-C-31-M-12 USB-C: 9.40x3.60mm rounded oval + 12.40x6.80mm exterior overmold relief (wall=2.0mm)
+    # 7d. TYPE-C-31-M-12 USB-C: 9.40x3.60mm rounded oval + plan/04 13.00x7.50mm exterior overmold pocket
+    #     Pocket floor at Y=183.20mm sits 0.35mm (<= 0.50mm!) ahead of J_USB's Y=182.85mm lip, with 2.69mm web to DC_JACK!
     usbs = nc["J_USB"]
     uw, uh = usbs["oval_wh"]
     cuts.append(oval_slot_y(usbs["x_center"], usbs["z_center"], 181.00, 186.50, uw, uh))
-    cuts.append(oval_slot_y(usbs["x_center"], usbs["z_center"], 184.00, 186.50, 12.40, 6.80))
+    cuts.append(oval_slot_y(usbs["x_center"], usbs["z_center"], 183.20, 186.50, 13.00, 7.50))
 
     # 7e. Tensility 54-00401 Insulated Panel DC Jack: Ø11.10 x 10.00mm D-bore
     dcs = nc["DC_JACK"]
@@ -377,22 +370,31 @@ def build_populated_solids() -> Dict[str, Tuple[bd.Solid, Tuple[float, float, fl
         beads_mod = (beads_mod + cyl_z(kx, ky, 0.00, kh, kr * 2.0)).solids()[0]
     solids["beads_module"] = (beads_mod, C_BEADS)
 
-    # 6. Shrouded 2x5 Eurorack Power Header (J_EURO_PWR) + 2x5 IDC Ribbon Cable inside Z=[-38.40, -27.00]
+    # 6. Shrouded 2x5 Eurorack Power Header (J_EURO_PWR at rot=90 deg, South of Beads PCB!) + Full ~16.2mm Mated IDC Plug & Ribbon
     mb_board = pcbnew.LoadBoard(str(ROOT / "hardware/main_board/main_board.kicad_pcb"))
     ox_mb, oy_mb = CONTRACT["boards"]["main_board"]["kicad_origin_world_mm"]
     mb_fps = {fp.GetReference(): fp for fp in mb_board.GetFootprints()}
 
     jpwr_pads = [(ox_mb + pcbnew.ToMM(p.GetPosition().x), oy_mb - pcbnew.ToMM(p.GetPosition().y))
                  for p in mb_fps["J_EURO_PWR"].Pads()]
-    ex_c = (min(x for x, _ in jpwr_pads) + max(x for x, _ in jpwr_pads)) / 2.0
-    ey_c = (min(y for _, y in jpwr_pads) + max(y for _, y in jpwr_pads)) / 2.0
-    # Shrouded 2x5 box header (8.8mm x 20.3mm x 8.9mm above main_board F.Cu -> Z=[-38.38, -29.50])
-    solids["J_EURO_PWR_header"] = (box_xyz(ex_c - 4.40, ex_c + 4.40, ey_c - 10.15, ey_c + 10.15,
-                                           Z_MAIN_FCU + 0.02, Z_MAIN_FCU + 8.90), C_BLACK)
-    # 2x5 IDC ribbon cable curving cleanly West from J_EURO_PWR into Beads' lower power bay (Z=[-29.30, -27.20])
+    ex_c = (min(x for x, _ in jpwr_pads) + max(x for x, _ in jpwr_pads)) / 2.0   # 101.00
+    ey_c = (min(y for _, y in jpwr_pads) + max(y for _, y in jpwr_pads)) / 2.0   # 48.10
+    # Würth 61201021621 shrouded 2x5 box header (20.32 x 8.85 x 9.10mm at rot=90 deg, hollowed inside for mated IDC plug)
+    euro_hdr = (
+        box_xyz(ex_c - 10.16, ex_c + 10.16, ey_c - 4.425, ey_c + 4.425, Z_MAIN_FCU + 0.02, Z_MAIN_FCU + 9.10)
+        - box_xyz(ex_c - 8.85, ex_c + 8.85, ey_c - 3.18, ey_c + 3.18, Z_MAIN_FCU + 2.60, Z_MAIN_FCU + 9.50)
+        - box_xyz(ex_c - 2.25, ex_c + 2.25, ey_c - 4.50, ey_c - 3.10, Z_MAIN_FCU + 2.60, Z_MAIN_FCU + 9.50)
+    ).solids()[0]
+    solids["J_EURO_PWR_header"] = (euro_hdr, C_BLACK)
+    # Full unshrunk 2x5 IDC female socket + strain-relief cap (17.27 x 6.00mm, reaching Z = F.Cu + 16.20 = -22.20mm!)
+    # + 12.70mm 10-conductor flat ribbon curving North into Beads' power bay (Z = [-32.00, -27.05] under Beads Z=-27.00)
     ribbon = (
-        box_xyz(ex_c - 4.00, ex_c + 4.00, ey_c - 7.00, ey_c + 7.00, Z_MAIN_FCU + 8.95, -27.20)
-        + box_xyz(108.00, ex_c + 4.00, ey_c - 6.35, ey_c + 6.35, -28.60, -27.20)
+        box_xyz(ex_c - 8.635, ex_c + 8.635, ey_c - 3.00, ey_c + 3.00, Z_MAIN_FCU + 2.80, Z_MAIN_FCU + 16.20)
+        + box_xyz(ex_c - 2.00, ex_c + 2.00, ey_c - 4.10, ey_c - 2.95, Z_MAIN_FCU + 4.00, Z_MAIN_FCU + 13.50)
+        + box_xyz(ex_c - 6.35, ex_c + 6.35, ey_c + 2.90, 54.40, Z_MAIN_FCU + 14.80, Z_MAIN_FCU + 16.20)
+        + box_xyz(ex_c - 6.35, ex_c + 6.35, 53.10, 54.40, -32.00, Z_MAIN_FCU + 16.20)
+        + box_xyz(ex_c - 6.35, ex_c + 6.35, 53.10, 74.00, -32.00, -30.60)
+        + box_xyz(ex_c - 8.635, ex_c + 8.635, 68.00, 74.00, -32.00, -27.05)
     ).solids()[0]
     solids["eurorack_2x5_ribbon"] = (ribbon, C_RIBBON)
 
@@ -440,24 +442,52 @@ def build_populated_solids() -> Dict[str, Tuple[bd.Solid, Tuple[float, float, fl
                      Z_MAIN_FCU + 1.00, Z_MAIN_FCU + 2.50)
     solids["SW_MIDI_AB"] = ((js_body + js_act).solids()[0], C_BLACK)
 
-    # 7d. TYPE-C-31-M-12 USB-C Receptacle
+    # 7d. TYPE-C-31-M-12 USB-C Receptacle (exact 8.94 x 7.30 x 3.16mm stainless shell: Y=[175.55, 182.85])
     upx = ox_mb + pcbnew.ToMM(mb_fps["J_USB"].GetPosition().x)
     upy = oy_mb - pcbnew.ToMM(mb_fps["J_USB"].GetPosition().y)
-    # Front oval tongue protrudes slightly into North wall oval bore (Y=174.70..182.40)
-    usbc = oval_slot_y(upx, nc["J_USB"]["z_center"], upy - 3.65, upy + 4.05, 8.94, 3.16)
+    usbc = oval_slot_y(upx, nc["J_USB"]["z_center"], upy - 3.65, upy + 3.65, 8.94, 3.16)
     solids["J_USB"] = (usbc, C_CHROME)
 
-    # 7e. Tensility 54-00401 Insulated Panel DC Jack + 360-deg M11 Hex Nut Sweep (SW=13.0mm -> Ø15.011mm)
+    # 7e. Tensility 54-00401 Insulated Panel DC Jack (true 17.60mm datasheet depth: 2.5mm flange + 9.5mm thread + 3.1mm rear + 2.5mm solder lugs)
     dcx, dcz = nc["DC_JACK"]["x_center"], nc["DC_JACK"]["z_center"]
     dc_flange = cyl_y(dcx, dcz, 185.62, 188.12, 13.50)
-    dc_shank = d_bore_y(dcx, dcz, 170.50, 185.62, 10.85, 9.75)
-    solids["DC_JACK"] = ((dc_flange + dc_shank).solids()[0], C_BLACK)
-    # 1.1mm lock washer (OD=14.0) + 2.5mm M11 hex nut 360-deg corner sweep (13.0 / cos(30) = 15.011mm) inside Y=178.30..181.95
+    dc_shank = d_bore_y(dcx, dcz, 176.12, 185.62, 10.85, 9.75)
+    dc_rear = cyl_y(dcx, dcz, 173.02, 176.12, 10.40)
+    dc_lug_a = box_xyz(dcx - 1.50, dcx + 1.50, 170.52, 173.05, dcz - 0.50, dcz + 0.50)
+    dc_lug_b = box_xyz(dcx - 1.50, dcx + 1.50, 170.52, 173.05, dcz - 4.20, dcz - 3.20)
+    solids["DC_JACK"] = ((dc_flange + dc_shank + dc_rear + dc_lug_a + dc_lug_b).solids()[0], C_BLACK)
+    # 1.1mm lock washer (OD=14.0) + 2.5mm M11 hex nut 360-deg corner sweep (13.0 / cos(30) = 15.011mm) inside Y=178.35..181.95
     dc_nut_sweep = (
         cyl_y(dcx, dcz, 178.35, 181.95, 13.00 / math.cos(math.radians(30.0)))
         - cyl_y(dcx, dcz, 178.00, 182.50, 11.05)
     ).solids()[0]
     solids["DC_JACK_nut_sweep"] = (dc_nut_sweep, C_CHROME)
+
+    # 7f. All 5x 1x2 (2.54mm) Off-Board Headers (J_PWR_IN, J_FS1, J_FS2, J_LED_FS1, J_LED_FS2) + Full 14.0mm Mated Crimp Housings
+    for href in ("J_PWR_IN", "J_FS1", "J_FS2", "J_LED_FS1", "J_LED_FS2"):
+        hpads = [(ox_mb + pcbnew.ToMM(p.GetPosition().x), oy_mb - pcbnew.ToMM(p.GetPosition().y))
+                 for p in mb_fps[href].Pads()]
+        hx1, hx2 = min(x for x, _ in hpads), max(x for x, _ in hpads)
+        hy1, hy2 = min(y for _, y in hpads), max(y for _, y in hpads)
+        hcx, hcy = (hx1 + hx2) / 2.0, (hy1 + hy2) / 2.0
+        span_x = max(2.54, (hx2 - hx1) + 2.54)
+        span_y = max(2.54, (hy2 - hy1) + 2.54)
+        # Samtec TSW-102-07-F-S male header (2.54mm base + 6.00mm square posts = 8.54mm above F.Cu)
+        h_base = box_xyz(hcx - span_x / 2.0, hcx + span_x / 2.0,
+                         hcy - span_y / 2.0, hcy + span_y / 2.0,
+                         Z_MAIN_FCU + 0.02, Z_MAIN_FCU + 2.56)
+        for px, py in hpads:
+            h_base = (h_base + box_xyz(px - 0.32, px + 0.32, py - 0.32, py + 0.32,
+                                       Z_MAIN_FCU + 2.56, Z_MAIN_FCU + 8.54)).solids()[0]
+        solids[f"{href}_header"] = (h_base, C_BLACK)
+        # Standard unshrunk 14.00mm 1x2 2.54mm female crimp housing (Z = F.Cu+2.60 .. F.Cu+16.60 = -21.80mm)
+        h_plug = box_xyz(hcx - span_x / 2.0, hcx + span_x / 2.0,
+                         hcy - span_y / 2.0, hcy + span_y / 2.0,
+                         Z_MAIN_FCU + 2.60, Z_MAIN_FCU + 16.60)
+        for px, py in hpads:
+            h_plug = (h_plug - box_xyz(px - 0.42, px + 0.42, py - 0.42, py + 0.42,
+                                       Z_MAIN_FCU + 2.50, Z_MAIN_FCU + 9.20)).solids()[0]
+        solids[f"{href}_plug"] = (h_plug, C_RED if href == "J_PWR_IN" else C_RIBBON)
 
     # 8. Stepped-Apron Footswitches (2x E-Switch FS5700SPMT2B2M1QEH + 360-deg inner/outer nuts + 2x bezel LEDs)
     nut_fs_od = 14.00 / math.cos(math.radians(30.0))  # 16.166 mm 360-deg across-corners sweep!
@@ -494,25 +524,23 @@ def build_populated_solids() -> Dict[str, Tuple[bd.Solid, Tuple[float, float, fl
         j_nut = (cyl_z(jx, jy, 0.02, 1.60, 8.00) - cyl_z(jx, jy, -0.2, 2.0, 6.05)).solids()[0]
         solids[f"{jkey}_nut"] = (j_nut, C_CHROME)
 
-    # 9b. 0.96" SSD1306 OLED Module + Low-Profile 1x4 Socket (Samtec SLW-104-01-G-S, 6.09mm mated stack)
+    # 9b. 0.96" SSD1306 OLED Module + Low-Profile 5.08mm Board-Stacker Header (Samtec DW-04-07-T-S-200: 8.13mm <= 8.50mm total stack!)
     mz_board = pcbnew.LoadBoard(str(ROOT / "hardware/ui_mezzanine/ui_mezzanine.kicad_pcb"))
     mz_fps = {fp.GetReference(): fp for fp in mz_board.GetFootprints()}
     oled_pads = [(ox_mz + pcbnew.ToMM(p.GetPosition().x), oy_mz - pcbnew.ToMM(p.GetPosition().y))
                  for p in mz_fps["J_OLED"].Pads()]
     ocx = (min(x for x, _ in oled_pads) + max(x for x, _ in oled_pads)) / 2.0
     ocy = oled_pads[0][1]
-    solids["J_OLED_socket"] = (box_xyz(ocx - 5.20, ocx + 5.20, ocy - 1.27, ocy + 1.27,
-                                       Z_MEZZ_FCU + 0.02, Z_MEZZ_FCU + 4.59), C_BLACK)
-    # Full 27.3 x 27.8 mm SSD1306 breakout PCB (Z = -5.51 .. -3.91) + 26.7 x 19.2 x 1.45mm OLED glass + header collar
+    solids["J_OLED_socket"] = (box_xyz(ocx - 5.08, ocx + 5.08, ocy - 1.27, ocy + 1.27,
+                                       Z_MEZZ_FCU + 0.02, Z_MEZZ_FCU + 5.06), C_BLACK)
+    # Full 27.30 x 27.80 x 1.60 mm SSD1306 breakout PCB (Z = -6.52 .. -4.92) + true 26.70 x 19.20 x 1.45 mm OLED glass (Z = -4.92 .. -3.47)
     oled_pcb = box_xyz(ow_wx - 13.65, ow_wx + 13.65, ocy - 25.80, ocy + 2.00,
-                       Z_MEZZ_FCU + 6.09, Z_MEZZ_FCU + 7.69)
-    oled_glass = box_xyz(ow_wx - 12.80, ow_wx + 12.80, ow_wy - 7.30, ow_wy + 7.30,
-                         Z_MEZZ_FCU + 7.69, Z_MEZZ_FCU + 9.14)
-    oled_hdr = box_xyz(ocx - 5.08, ocx + 5.08, ocy - 1.25, ocy + 1.25,
-                       Z_MEZZ_FCU + 4.62, Z_MEZZ_FCU + 6.09)
-    solids["SSD1306_oled"] = ((oled_pcb + oled_glass + oled_hdr).solids()[0], C_OLED)
+                       Z_MEZZ_FCU + 5.08, Z_MEZZ_FCU + 6.68)
+    oled_glass = box_xyz(ow_wx - 13.35, ow_wx + 13.35, ow_wy - 10.60, ow_wy + 8.60,
+                         Z_MEZZ_FCU + 6.68, Z_MEZZ_FCU + 8.13)
+    solids["SSD1306_oled"] = ((oled_pcb + oled_glass).solids()[0], C_OLED)
 
-    # 9c. Alps EC11E15244G1 Rotary Encoder (H=20.0mm above ui_mezzanine F.Cu -> shaft top Z = +8.40 mm >= +8.00 mm!)
+    # 9c. Alps EC11E15244G1 Bushingless Rotary Encoder (15 PPR / 30 detents, H=20.0mm above F.Cu -> shaft top Z = +8.40 mm >= +8.00 mm; NO panel nut!)
     ex, ey = ox_mz + feats["SW_ENC"]["x"], oy_mz - feats["SW_ENC"]["y"]
     ec_solid = (
         box_xyz(ex - 6.00, ex + 6.00, ey - 5.80, ey + 5.80, Z_MEZZ_FCU + 0.02, Z_MEZZ_FCU + 6.50)
@@ -520,18 +548,18 @@ def build_populated_solids() -> Dict[str, Tuple[bd.Solid, Tuple[float, float, fl
         + cyl_z(ex, ey, Z_MEZZ_FCU + 13.50, Z_MEZZ_FCU + 20.00, 6.00)
     ).solids()[0]
     solids["SW_ENC"] = (ec_solid, C_CHROME)
-    solids["SW_ENC_nut"] = ((cyl_z(ex, ey, 0.02, 1.80, 10.00) - cyl_z(ex, ey, -0.2, 2.2, 6.95)).solids()[0], C_CHROME)
 
-    # 9d. 2x Dual-Gang 9mm Pots (RV_IN_TRIM, RV_OUT_TRIM -> shaft top Z = +8.40 mm >= +8.00 mm!)
+    # 9d. 2x Taiwan Alpha RD902F-40-15R1-B10K-00D Vertical Dual-Gang Pots (10.0mm body + L=15.0mm -> shaft top Z = +13.40 mm >= +8.00 mm!)
+    pot_nut_od = 10.00 / math.cos(math.radians(30.0))  # 11.547 mm 360-deg M7 hex nut corner sweep
     for pkey in ("RV_IN_TRIM", "RV_OUT_TRIM"):
         px, py = ox_mz + feats[pkey]["x"], oy_mz - feats[pkey]["y"]
         pot_solid = (
             box_xyz(px - 6.50, px + 4.80, py - 4.75, py + 4.75, Z_MEZZ_FCU + 0.02, Z_SHELF_LEFT - 0.02)
-            + cyl_z(px, py, Z_SHELF_LEFT - 0.02, 3.40, 6.80)
-            + cyl_z(px, py, 3.40, Z_MEZZ_FCU + 20.00, 6.00)
+            + cyl_z(px, py, Z_SHELF_LEFT - 0.02, Z_SHELF_LEFT + 5.00, 6.80)
+            + cyl_z(px, py, Z_SHELF_LEFT + 5.00, Z_SHELF_LEFT + 15.00, 6.00)
         ).solids()[0]
         solids[pkey] = (pot_solid, C_CHROME)
-        solids[f"{pkey}_nut"] = ((cyl_z(px, py, 0.02, 1.80, 10.00) - cyl_z(px, py, -0.2, 2.2, 6.95)).solids()[0], C_CHROME)
+        solids[f"{pkey}_nut"] = ((cyl_z(px, py, 0.02, 2.32, pot_nut_od) - cyl_z(px, py, -0.2, 2.6, 7.05)).solids()[0], C_CHROME)
 
     # 9e. Tactile BACK Button (H=13.0mm -> top Z = +1.40mm) & PEAK 3mm LED
     bkx, bky = ox_mz + feats["SW_BACK"]["x"], oy_mz - feats["SW_BACK"]["y"]
@@ -554,13 +582,13 @@ def build_populated_solids() -> Dict[str, Tuple[bd.Solid, Tuple[float, float, fl
         sock = box_xyz(bcx - 2.54, bcx + 2.54, bcy - 10.20, bcy + 10.20, Z_MEZZ_BCU - 8.53, Z_MEZZ_BCU - 0.02)
         for px, py in pads:
             sock = (sock - box_xyz(px - 0.42, px + 0.42, py - 0.42, py + 0.42,
-                                   Z_MEZZ_BCU - 8.60, Z_MEZZ_BCU - 1.20)).solids()[0]
+                                   Z_MEZZ_BCU - 8.60, Z_MEZZ_BCU - 1.10)).solids()[0]
         solids[f"{btb_ref}_mz_socket"] = (sock, C_BLACK)
-        # Tall board-stacker male header on main_board F.Cu (Samtec DW-08-14, spacer Z=[-38.38, -21.76] + 16 posts to -15.80)
-        hdr = box_xyz(bcx - 2.54, bcx + 2.54, bcy - 10.20, bcy + 10.20, Z_MAIN_FCU + 0.02, Z_MEZZ_BCU - 8.56)
+        # Tall board-stacker male header on main_board F.Cu (Samtec DW-08-12-L-D-655: 1.030" OAL = 23.37mm above F.Cu -> Z_top = -15.03mm!)
+        hdr = box_xyz(bcx - 2.54, bcx + 2.54, bcy - 10.20, bcy + 10.20, Z_MAIN_FCU + 0.02, Z_MAIN_FCU + 16.64)
         for px, py in pads:
             hdr = (hdr + box_xyz(px - 0.32, px + 0.32, py - 0.32, py + 0.32,
-                                 Z_MEZZ_BCU - 8.56, Z_MEZZ_BCU - 2.60)).solids()[0]
+                                 Z_MAIN_FCU + 16.64, Z_MAIN_FCU + 23.37)).solids()[0]
         solids[f"{btb_ref}_mb_header"] = (hdr, C_BLACK)
 
     # 11. Key tall components on main_board (DIP-6 H11L1, 47uF electrolytics, inductors, relays)
@@ -868,15 +896,15 @@ def render_cross_section_and_wiring_diagrams(out_dir: pathlib.Path) -> None:
 
     # Reference Z=0.00mm and Z=-45.00mm datum lines
     d.line([yz(-6, 0.0), yz(194, 0.0)], fill=(37, 99, 235), width=2)
-    d.text((yz(187, 1.8)[0] - 110, yz(187, 1.8)[1]), "Z = 0.00 mm (Flush 3U Plane)", fill=(37, 99, 235), font=f_h2)
+    d.text((yz(187, 3.2)[0] - 115, yz(187, 3.2)[1]), "Z = 0.00 mm (Flush 3U Plane)", fill=(37, 99, 235), font=f_h2)
     d.line([yz(-6, -45.0), yz(194, -45.0)], fill=(100, 116, 139), width=2)
-    d.text((yz(187, -45.0)[0] - 110, yz(187, -45.0)[1] + 6), "Z = -45.00 mm (Pedalboard Floor)", fill=(71, 85, 105), font=f_h2)
+    d.text((yz(187, -45.0)[0] - 115, yz(187, -45.0)[1] + 6), "Z = -45.00 mm (Pedalboard Floor)", fill=(71, 85, 105), font=f_h2)
 
     # PETG-HF Enclosure cross-section
     c_petg = (55, 65, 81)
     rect_yz(0.0, 3.6, -45.0, -12.0, c_petg)             # South wall
     rect_yz(3.6, 39.0, -16.0, -12.0, c_petg)            # Stepped stomp apron deck
-    rect_yz(17.5, 24.5, -42.0, -16.0, (75, 85, 99))     # Stomp load-transfer pillar
+    rect_yz(15.0, 22.0, -42.0, -16.0, (75, 85, 99), outline=(100, 116, 139), width=1)  # Flanking X-offset stomp pillar (behind FS1)
     rect_yz(39.0, 42.85, -16.0, 0.0, c_petg)            # 12mm step riser wall
     rect_yz(42.85, 52.60, -6.0, -1.6, c_petg)           # South 3U rail lip + M3 boss
     rect_yz(161.10, 171.35, -6.0, -1.6, c_petg)         # North 3U rail lip + M3 boss
@@ -894,22 +922,28 @@ def render_cross_section_and_wiring_diagrams(out_dir: pathlib.Path) -> None:
     # Neutrik NMJ4HCD2 at North edge (Y=[161.19, 181.80], Z=[-38.4, -22.2] + ferrule nose to 187.59)
     rect_yz(161.19, 181.80, -38.4, -22.2, (38, 38, 42))
     rect_yz(181.80, 187.59, -35.81, -24.71, (180, 188, 198))
-    # Shrouded 2x5 Eurorack Header + Ribbon (Y=[70, 90], Z=[-38.4, -27.2])
-    rect_yz(72.6, 86.6, -38.4, -29.5, (40, 40, 46))
-    rect_yz(74.0, 105.0, -28.8, -27.2, (220, 50, 50))
-    # 2x8 Tall BTB Stacker + Socket (Y=[80, 100], Z=[-38.4, -13.2])
-    rect_yz(80.0, 100.0, -38.4, -21.7, (50, 50, 58))
-    rect_yz(80.0, 100.0, -21.7, -13.2, (30, 30, 36))
+    # Shrouded 2x5 Eurorack Header + Full 16.2mm Mated IDC Plug & Ribbon (Y=48.1mm South of Beads PCB!)
+    rect_yz(43.7, 52.5, -38.4, -29.3, (40, 40, 46))
+    rect_yz(45.1, 51.1, -35.6, -22.2, (220, 50, 50))
+    rect_yz(51.1, 54.4, -23.6, -22.2, (220, 50, 50))
+    rect_yz(53.1, 54.4, -32.0, -22.2, (220, 50, 50))
+    rect_yz(53.1, 74.0, -32.0, -30.6, (220, 50, 50))
+    rect_yz(68.0, 74.0, -32.0, -27.1, (220, 50, 50))
+    # 2x8 Tall BTB Stacker DW-08-12-L-D-655 + B.Cu Socket (Y=[80, 100], Z=[-38.4, -13.2])
+    rect_yz(80.0, 100.0, -38.4, -21.76, (50, 50, 58))
+    rect_yz(80.0, 100.0, -21.73, -13.2, (30, 30, 36))
 
-    # ui_mezzanine (Y=[52.85, 160.85], Z=[-13.2, -11.6]) + Thonkiconn + Pots/Encoder (+8.4mm shaft!)
+    # ui_mezzanine (Y=[52.85, 160.85], Z=[-13.2, -11.6]) + Thonkiconn + Pots/Encoder (+8.4mm / +13.4mm shafts!)
     rect_yz(52.85, 160.85, -13.2, -11.6, (22, 128, 61))
     rect_yz(62.0, 72.5, -11.6, -1.6, (45, 45, 52))
     rect_yz(64.0, 70.0, -1.6, 1.9, (190, 196, 204))
-    # Encoder/Dual Pot with >=8.40mm shaft protrusion!
+    # Dual Pot RD902F-40-15 (+13.40mm shaft) & EC11E (+8.40mm shaft!)
     rect_yz(115.0, 124.5, -11.6, -1.6, (70, 75, 85))
-    rect_yz(116.8, 122.8, -1.6, 8.4, (196, 202, 210))
-    # SSD1306 OLED behind milled window
-    rect_yz(131.0, 158.0, -5.5, -2.4, (14, 116, 178))
+    rect_yz(116.6, 123.4, -1.6, 3.4, (170, 178, 190))
+    rect_yz(117.0, 123.0, 3.4, 13.4, (196, 202, 210))
+    # SSD1306 OLED (8.13mm <= 8.50mm stack on DW-04-07-T-S-200) behind milled window
+    rect_yz(130.6, 158.3, -6.52, -4.92, (22, 128, 61))
+    rect_yz(133.3, 152.5, -4.92, -3.47, (14, 116, 178))
 
     # faceplate_14hp (Z=[-1.6, 0.0]) & Beads rear PCB dashed outline (Y=[54.6, 159.6], Z=[-27.0, -2.0])
     rect_yz(42.85, 171.35, -1.6, 0.0, (24, 24, 28))
@@ -917,19 +951,19 @@ def render_cross_section_and_wiring_diagrams(out_dir: pathlib.Path) -> None:
     bx2, by1 = yz(159.6, -2.0)
     d.rectangle([(bx1, by1), (bx2, by2)], outline=(180, 83, 9), width=3)
 
-    # Footswitch FS1 on Stepped Apron (Y=21.0, Z_apron=-12.0)
-    rect_yz(15.0, 27.0, -34.5, -16.0, (148, 163, 184))
-    rect_yz(16.0, 26.0, -12.0, -2.4, (203, 213, 225))
+    # Footswitch FS1 on Stepped Apron (Y=18.5, Z_apron=-12.0)
+    rect_yz(12.5, 24.5, -34.5, -16.0, (148, 163, 184))
+    rect_yz(13.5, 23.5, -12.0, -2.4, (203, 213, 225))
 
     # Clear callout annotations
     notes = [
-        ((21.0, -5.0), (150, 240), "FS1 / FS2 Soft-Touch Momentary\nZ=-12mm Stepped Apron + Load Pillars"),
-        ((67.0, 1.0), (490, 130), "12x Thonkiconn + Faceplate (Z=0.0mm)\n-1.6mm Left Shelf / -2.0mm Beads Shelf"),
-        ((120.0, 8.4), (860, 125), "EC11 & Dual-Gang Pots: +8.40 mm\nShaft Protrusion (>= 8.0 mm Spec!)"),
-        ((145.0, -3.5), (1180, 195), "0.96\" SSD1306 OLED on SLW-104\nLow-Profile Socket Behind Window"),
-        ((172.0, -30.26), (1250, 825), "4x Neutrik NMJ4HCD2 (Y=161.19..181.80)\n100% North of Beads Rear PCB (Y<=159.6)!"),
-        ((82.0, -28.0), (620, 835), "11.4mm Clear Ribbon Bay Under Beads\n(Z=-27.0..-38.4mm) RED STRIPE = -12V"),
-        ((90.0, -26.0), (240, 835), "2x8 Board-to-Board Stackers\n0.000 mm XY Congruence, 25.2mm Span"),
+        ((18.5, -5.0), (145, 235), "FS1 / FS2 Momentary (-M1QEH)\nZ=-12mm Stepped Apron + Load Pillars"),
+        ((67.0, 1.0), (470, 130), "12x Thonkiconn + Faceplate (Z=0.0mm)\n-1.6mm Left Shelf / -2.0mm Beads Shelf"),
+        ((120.0, 11.5), (850, 115), "RD902F Pots (+13.4mm) & EC11E (+8.4mm)\nShaft Protrusions >= 8.0mm Spec!"),
+        ((144.0, -4.2), (1180, 195), "0.96\" SSD1306 + 19.2mm Glass\n8.13mm <= 8.5mm Stack (DW-04-07-T-S-200)"),
+        ((172.0, -30.26), (1240, 825), "4x Neutrik NMJ4HCD2 + 17.6mm DC_JACK\n100% North of Beads Rear PCB (Y<=159.6)!"),
+        ((48.1, -24.0), (220, 835), "J_EURO_PWR South of Beads (Y=48.1mm)\n32.4mm Headroom for 16.2mm IDC Plug!"),
+        ((90.0, -26.0), (740, 835), "Samtec DW-08-12-L-D-655 + B.Cu Sockets\n23.37mm Post inside 25.2mm Gap (0.00mm XY)"),
     ]
     for (wy, wz), (lx, ly), txt in notes:
         ax, ay = yz(wy, wz)
@@ -974,28 +1008,30 @@ def render_cross_section_and_wiring_diagrams(out_dir: pathlib.Path) -> None:
 
     # North wall connectors
     n_labels = [
-        (15.5, "OUT R"), (35.5, "OUT L/M"), (55.5, "IN R"), (75.5, "IN L/M"),
-        (93.0, "THRU"), (105.0, "A|B"), (117.0, "IN"), (129.5, "USB-C"), (140.4, "DC"),
+        (15.5, "OUT R", -20), (35.5, "OUT L/M", -28), (55.5, "IN R", -14), (75.5, "IN L/M", -22),
+        (93.0, "THRU", -18), (105.0, "A|B", -12), (117.0, "IN", -8), (129.5, "USB-C", -24), (140.4, "DC", -8),
     ]
-    for nx, nl in n_labels:
+    for nx, nl, dx_lbl in n_labels:
         px, py = xy(nx, 183.8)
-        d2.ellipse([(px - 9, py - 9), (px + 9, py + 9)], fill=(30, 41, 59))
-        d2.text((px - 16, py - 30), nl, fill=(15, 23, 42), font=f_b)
+        d2.ellipse([(px - 8, py - 8), (px + 8, py + 8)], fill=(30, 41, 59))
+        d2.text((px + dx_lbl, py - 30), nl, fill=(15, 23, 42), font=f_b)
 
     # Wiring callouts inside diagram:
-    # 1. DC Jack (140.4, 183.8) -> J_PWR_IN (141.5, 167.6)
+    # 1. DC Jack (140.4, 183.8, 17.6mm deep to Y=170.5) -> J_PWR_IN (141.77, 162.6)
     p_dc = xy(140.4, 180.0)
-    p_jpwr = xy(141.5, 167.6)
+    p_jpwr = xy(141.77, 162.6)
     d2.line([p_dc, p_jpwr], fill=(220, 38, 38), width=4)
     d2.ellipse([p_jpwr[0] - 6, p_jpwr[1] - 6, p_jpwr[0] + 6, p_jpwr[1] + 6], fill=(220, 38, 38))
+    d2.text((p_jpwr[0] - 64, p_jpwr[1] + 8), "J_PWR_IN", fill=(185, 28, 28), font=f_b)
 
-    # 2. J_EURO_PWR (132.3, 75.0) -> Beads 2x5 Power Header
-    p_euro = xy(132.3, 75.0)
-    p_beads_pwr = xy(105.0, 75.0)
-    d2.rectangle([p_euro[0] - 16, p_euro[1] - 32, p_euro[0] + 16, p_euro[1] + 32], fill=(30, 41, 59))
-    d2.line([(p_euro[0] - 18, p_euro[1] - 28), (p_euro[0] + 18, p_euro[1] - 28)], fill=(220, 38, 38), width=5)
+    # 2. J_EURO_PWR (101.0, 48.1, rot=90 deg South of Beads PCB!) -> Beads 2x5 Power Header
+    p_euro = xy(101.0, 48.1)
+    p_beads_pwr = xy(101.0, 71.0)
+    d2.rectangle([p_euro[0] - 48, p_euro[1] - 20, p_euro[0] + 48, p_euro[1] + 20], fill=(30, 41, 59))
+    # Thick vertical RED STRIPE bar on WEST/LEFT end (Pins 1 & 2 = -12V_EUR!)
+    d2.line([(p_euro[0] - 44, p_euro[1] - 22), (p_euro[0] - 44, p_euro[1] + 22)], fill=(220, 38, 38), width=6)
     d2.line([p_euro, p_beads_pwr], fill=(220, 38, 38), width=5)
-    d2.text((p_beads_pwr[0] - 75, p_beads_pwr[1] + 12), "2x5 IDC Ribbon\nRED STRIPE = -12V (Pins 1-2!)", fill=(185, 28, 28), font=f_h2)
+    d2.text((p_beads_pwr[0] - 115, p_beads_pwr[1] - 52), "2x5 IDC Ribbon (South of Beads!)\nWEST RED STRIPE = -12V (Pins 1-2)", fill=(185, 28, 28), font=f_h2)
 
     # 3. 2x8 BTB Headers (staggered vertical label offsets so zero overlap!)
     for bx, lbl, dy_lbl in [(29.65, "J_BTB_AUDIO_CV", 44), (52.65, "J_BTB_UI_DIG", 64)]:
@@ -1025,32 +1061,32 @@ def render_cross_section_and_wiring_diagrams(out_dir: pathlib.Path) -> None:
             "• CENTER PIN (0V GND)       -->  J_PWR_IN Pin 2 (GND_CENTER).",
             "• Protected on-board by 1.1A 33V PTC + SMBJ20CA + AO3401A RPP.",
         ]),
-        ("2. EURORACK 2x5 POWER HEADER (J_EURO_PWR)", (185, 28, 28), [
-            "• Pins 1 & 2 (NORTH / SILKSCREEN BAR) = -12.0V EUR (RED STRIPE!).",
-            "• Pins 3..8 = GND   |   Pins 9 & 10 (SOUTH) = +12.0V EUR.",
-            "• Verify RED STRIPE matches -12V marking on Mutable Instruments Beads!",
+        ("2. EURORACK 2x5 POWER HEADER (J_EURO_PWR @ Y=48.1mm)", (185, 28, 28), [
+            "• Pins 1 & 2 (WEST / LEFT SILKSCREEN BAR) = -12.0V EUR (RED STRIPE!).",
+            "• Pins 3..8 = GND   |   Pins 9 & 10 (EAST / RIGHT) = +12.0V EUR.",
+            "• Shroud notch faces SOUTH; match RED STRIPE to -12V mark on Beads!",
         ]),
         ("3. REVERSIBLE 0.96\" SSD1306 OLED JUMPER (JP_OLED_PWR)", (2, 132, 199), [
-            "• Check your 4-pin OLED pin order BEFORE plugging into J_OLED:",
+            "• Check your 4-pin OLED pin order BEFORE soldering/plugging J_OLED:",
             "  - Mode A (GND-VCC-SCL-SDA): bridge 1-2 & 4-5 on JP_OLED_PWR.",
             "  - Mode B (VCC-GND-SCL-SDA): bridge 2-3 & 5-6 on JP_OLED_PWR.",
-            "• Mount on Samtec SLW-104-01-G-S (4.57mm low-profile female socket).",
+            "• Mount via Samtec DW-04-07-T-S-200 (5.08mm spacer -> 8.13mm <= 8.5mm stack!).",
         ]),
         ("4. STEPPED APRON FOOTSWITCH & LED HEADERS", (30, 64, 175), [
-            "• FS1 (Left, X=30mm): E-Switch FS5700SPMT2B2M1QEH lugs 1 & 2 -> J_FS1.",
-            "• FS2 (Right, X=122mm): E-Switch FS5700SPMT2B2M1QEH lugs 1 & 2 -> J_FS2.",
+            "• FS1 (Left, X=30mm): E-Switch FS5700SPMT2B2M1QEH (EG5495-ND) -> J_FS1.",
+            "• FS2 (Right, X=122mm): E-Switch FS5700SPMT2B2M1QEH (EG5495-ND) -> J_FS2.",
             "• Apron 3mm LEDs: Pin 1 = Anode (+3V3), Pin 2 = Cathode -> J_LED_FS1/2.",
         ]),
         ("5. 18x M3 BRASS HEAT-SET INSERTS (M3 x L4.0 x OD4.6 mm @ 240°C)", (15, 23, 42), [
             "• 8x Top 3U Eurorack rail bosses (4x Left @ Z=-1.6mm, 4x Right @ Z=-2.0mm).",
-            "• 6x Internal main_board bosses MH101..MH106 (at Z=-38.40mm).",
+            "• 6x Internal main_board bosses MH101..103 (Y=41mm) & MH104..106 (Y=142mm).",
             "• 4x South apron bottom-lid bosses (at Z=-42.00mm).",
             "• Fasten faceplate & Beads with 8x M3x6mm Knurlies (dead-flush at Z=0!).",
         ]),
         ("6. HEADERLESS USB-C UF2 FIRMWARE FLASHING", (5, 150, 105), [
             "• Fresh RP2040 mounts automatically as RPI-RP2 over USB-C (<1 uA isolated).",
             "• Drag-and-drop firmware/build/beads_bridge.uf2 — zero SWD pins needed!",
-            "• Future updates: OLED Menu -> SYSTEM -> USB FIRMWARE UPDATE (or 1200bps).",
+            "• Future updates: OLED Menu -> SYSTEM -> USB FW UPDATE (or 1200bps CDC).",
         ]),
     ]
     cy_txt = 138
@@ -1140,9 +1176,9 @@ def main() -> int:
         subtitle="Flush 3mm Service Lid | 2-Layer main_board (Z=-38.4mm) | 18x M3 Brass Heat-Set Inserts | Stomp Load Pillars | 2x5 Red-Stripe Header",
         callouts=[
             ((76.0, 95.0, -76.0), (960, 915), "Flush 3.0mm PETG-HF Bottom Service Lid"),
-            ((76.0, 100.0, -39.2), (90, 560), "main_board (Top-Side JLCPCB SMT + >89% GND)"),
-            ((132.3, 75.0, -32.0), (1080, 560), "Shrouded 2x5 Eurorack Header + Ribbon"),
-            ((16.5, 21.0, -28.0), (95, 790), "4x Full-Height Stomp Force Pillars"),
+            ((76.0, 100.0, -39.2), (90, 560), "main_board (Top-Side JLCPCB SMT + 92.6% GND)"),
+            ((101.0, 48.1, -30.0), (1040, 740), "J_EURO_PWR South of Beads + 16.2mm IDC Plug"),
+            ((108.5, 18.5, -41.5), (95, 790), "4x Full-Height Stomp Force Pillars"),
         ],
     )
 

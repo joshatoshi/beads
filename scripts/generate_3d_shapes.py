@@ -72,11 +72,11 @@ def build_all_custom_3dshapes() -> list[pathlib.Path]:
     ec_shaft = bd.Pos(7.50, -2.50, 16.75) * bd.Cylinder(3.00, 6.50)
     exported.append(export_model("RotaryEncoder_Alps_EC11E_H20mm", ec_body + ec_bush + ec_shaft))
 
-    # 7. Dual-Gang 9mm Vertical Potentiometer (Alpha RD902F-20 / Bourns PTD902-2020K-B103)
-    #    KiCad rot=0: shaft center at (+7.50, +2.50) -> (7.50, -2.50), shoulder Z=10.0, total Z=20.0
+    # 7. Dual-Gang 9mm Vertical Potentiometer (Taiwan Alpha RD902F-40-15R1-B10K-00D / RD902F-40-15F-B10K-00D)
+    #    KiCad rot=0: shaft center at (+7.50, +2.50) -> (7.50, -2.50), body shoulder Z=10.0, L=15.0mm (5.0mm M7 bushing + 10.0mm shaft -> total Z=25.0mm)
     pot_body = bd.Pos(6.65, -2.50, 5.00) * bd.Box(11.30, 9.50, 10.00)
     pot_bush = bd.Pos(7.50, -2.50, 12.50) * bd.Cylinder(3.40, 5.00)
-    pot_shaft = bd.Pos(7.50, -2.50, 17.50) * bd.Cylinder(3.00, 5.00)
+    pot_shaft = bd.Pos(7.50, -2.50, 20.00) * bd.Cylinder(3.00, 10.00)
     exported.append(export_model("Potentiometer_Dual_9mm_Vertical", pot_body + pot_bush + pot_shaft))
 
     # 8. Tactile BACK Pushbutton 6x6mm H=13.0mm
@@ -102,10 +102,34 @@ def build_all_custom_3dshapes() -> list[pathlib.Path]:
     return exported
 
 
+def strip_model_blocks(s: str) -> str:
+    while True:
+        m = re.search(r'\s*\(model\s+"[^"]+"', s)
+        if not m:
+            return s
+        start = m.start()
+        depth = 0
+        i = s.find("(model", start)
+        end = len(s)
+        while i < len(s):
+            if s[i] == "(":
+                depth += 1
+            elif s[i] == ")":
+                depth -= 1
+                if depth == 0:
+                    end = i + 1
+                    break
+            i += 1
+        while end < len(s) and s[end] in " \t\r\n":
+            end += 1
+        s = s[:start] + "\n" + s[end:]
+
+
 def link_models_into_custom_footprints() -> None:
     mapping = {
         "Jack_6.35mm_Neutrik_NMJ4HCD2_TightCrtYd.kicad_mod": "Jack_6.35mm_Neutrik_NMJ4HCD2.step",
         "Jack_3.5mm_CUI_SJ1-3523N_Clean.kicad_mod": "Jack_3.5mm_CUI_SJ1-3523N.step",
+        "USB_C_Receptacle_HRO_TYPE-C-31-M-12_EdgeClean.kicad_mod": "USB_C_Receptacle_HRO_TYPE-C-31-M-12.step",
         "QFN-56-1EP_7x7mm_RP2040_SegPaste.kicad_mod": "QFN-56_RP2040_7x7mm.step",
         "VQFN-24-1EP_4x4mm_TPS65131_SegPaste.kicad_mod": "VQFN-24_TPS65131_4x4mm.step",
         "SOIC-8-1EP_TPS5430_SegPaste.kicad_mod": "SOIC-8_TPS5430.step",
@@ -125,11 +149,11 @@ def link_models_into_custom_footprints() -> None:
             f'    (rotate (xyz 0 0 0))\n'
             f'  )\n'
         )
-        # Remove any existing (model ...) block before closing ')'
-        txt = re.sub(r'\s*\(model\s+"[^"]+".*?\n\s*\)\n', "\n", txt, flags=re.S)
+        # Remove any existing (model ...) block cleanly using balanced parenthesis matching
+        txt = strip_model_blocks(txt)
         idx = txt.rfind(")")
         assert idx != -1
-        new_txt = txt[:idx] + model_block + ")\n"
+        new_txt = txt[:idx].rstrip() + "\n" + model_block + ")\n"
         mod_path.write_text(new_txt, encoding="utf-8")
 
 

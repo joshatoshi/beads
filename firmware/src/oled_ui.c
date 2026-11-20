@@ -11,7 +11,7 @@ static const uint8_t OLED_INIT_SEQ[] = {
     0xD3u, 0x00u,
     0x40u,
     0x8Du, 0x14u, /* Charge pump ON */
-    0x20u, 0x02u, /* Page addressing mode (clean 1-page <1ms slices!) */
+    0x20u, 0x02u, /* Page addressing mode (clean 1-page slices!) */
     0xA1u, 0xC8u,
     0xDAu, 0x12u,
     0x81u, 0xCFu,
@@ -19,6 +19,23 @@ static const uint8_t OLED_INIT_SEQ[] = {
     0xDBu, 0x40u,
     0xA4u, 0xA6u,
     0xAFu  /* Display ON */
+};
+
+static const char *const MODE_NAMES[10] = {
+    "BEZIER", "LFO", "EUCLID", "1V/OCT", "GATE",
+    "CLKDIV", "MIDICC", "GTRENV", "PLUCK", "FS2"
+};
+
+static const char *const LFO_NAMES[6] = {
+    "SINE", "TRI", "RAMP+", "RAMP-", "SQR", "S&H"
+};
+
+static const char *const SPAN_NAMES[5] = {
+    "+-8V", "+-5V", "+-2.5", "0..5V", "0..8V"
+};
+
+static const char *const CLK_DIV_NAMES[8] = {
+    "/1", "/3", "/6", "/12", "/24", "/48", "/72", "/96"
 };
 
 static void fb_set_pixel(oled_ui_t *ui, uint8_t x, uint8_t y) {
@@ -68,6 +85,62 @@ static void fb_draw_str(oled_ui_t *ui, uint8_t x, uint8_t y, const char *s) {
     }
 }
 
+/* Zero-division integer decimal formatter (0..9999) */
+static void fmt_u16(char *buf, uint16_t val, uint8_t min_digits) {
+    static const uint16_t POW10[4] = { 1000u, 100u, 10u, 1u };
+    uint8_t pos = 0u;
+    bool started = false;
+    for (uint8_t i = 0u; i < 4u; i++) {
+        uint8_t d = 0u;
+        while (val >= POW10[i]) {
+            val = (uint16_t)(val - POW10[i]);
+            d++;
+        }
+        uint8_t rem_digits = (uint8_t)(4u - i);
+        if (d > 0u || started || rem_digits <= min_digits) {
+            buf[pos++] = (char)('0' + d);
+            started = true;
+        }
+    }
+    buf[pos] = '\0';
+}
+
+static void fmt_i8_pct(char *buf, int8_t val) {
+    uint8_t pos = 0u;
+    uint16_t mag = 0u;
+    if (val < 0) {
+        buf[pos++] = '-';
+        mag = (uint16_t)(-(int16_t)val);
+    } else {
+        buf[pos++] = '+';
+        mag = (uint16_t)val;
+    }
+    fmt_u16(&buf[pos], mag, 1u);
+    size_t len = strlen(buf);
+    buf[len] = '%';
+    buf[len + 1u] = '\0';
+}
+
+static void fmt_sub_mode(char *buf, const cv_channel_cfg_t *c) {
+    if (c->mode == CV_MODE_LFO) {
+        uint8_t w = (c->sub_mode < 6u) ? c->sub_mode : 0u;
+        strcpy(buf, LFO_NAMES[w]);
+    } else if (c->mode == CV_MODE_MIDI_CLOCK_DIV) {
+        strcpy(buf, CLK_DIV_NAMES[c->sub_mode & 0x07u]);
+    } else if (c->mode == CV_MODE_MIDI_CC) {
+        buf[0] = 'C'; buf[1] = 'C';
+        fmt_u16(&buf[2], (uint16_t)(c->sub_mode & 0x7Fu), 1u);
+    } else if (c->mode == CV_MODE_GUITAR_ENV) {
+        strcpy(buf, (c->sub_mode != 0u) ? "DUCK" : "NORM");
+    } else if (c->mode == CV_MODE_MIDI_GATE_TRIG) {
+        strcpy(buf, (c->sub_mode != 0u) ? "TRIG" : "GATE");
+    } else if (c->mode == CV_MODE_FS2_ACTION) {
+        strcpy(buf, (c->sub_mode == 1u) ? "SEED" : "FREEZE");
+    } else {
+        fmt_u16(buf, c->sub_mode, 1u);
+    }
+}
+
 void oled_ui_init(oled_ui_t *ui) {
     memset(ui, 0, sizeof(*ui));
     ui->page = UI_PAGE_SCOPE;
@@ -84,8 +157,20 @@ void oled_ui_handle_usb_cdc_line_coding(oled_ui_t *ui, uint32_t bit_rate) {
     }
 }
 
+static uint8_t sub_mode_max_for(uint8_t mode) {
+    switch ((cv_mode_t)mode) {
+        case CV_MODE_LFO:            return 5u;
+        case CV_MODE_MIDI_CLOCK_DIV: return 7u;
+        case CV_MODE_MIDI_CC:        return 127u;
+        case CV_MODE_MIDI_GATE_TRIG:
+        case CV_MODE_GUITAR_ENV:     return 1u;
+        case CV_MODE_FS2_ACTION:     return 2u;
+        default:                     return 7u;
+    }
+}
+
 void oled_ui_handle_inputs(oled_ui_t *ui, int32_t enc_delta, bool enc_click, bool back_click,
-                           cv_engine_t *eng, preset_mgr_t *pm) {
+                           cv_engine_t *eng, bypass_seq_t *byp, midi_router_t *midi, preset_mgr_t *pm) {
     if (enc_delta == 0 && !enc_click && !back_click) {
         return;
     }
@@ -94,9 +179,14 @@ void oled_ui_handle_inputs(oled_ui_t *ui, int32_t enc_delta, bool enc_click, boo
     if (back_click) {
         if (ui->editing) {
             ui->editing = false;
+            if (ui->page == UI_PAGE_SYSTEM && ui->cursor == 1u) {
+                hal_crit_enter();
+                eng->cal_override_active = false;
+                hal_crit_exit();
+            }
         } else {
             ui->page = (ui->page == UI_PAGE_SCOPE) ? UI_PAGE_SYSTEM : (ui_page_t)(ui->page - 1u);
-            ui->cursor = 0u;
+            ui->cursor = (ui->page == UI_PAGE_PRESET) ? eng->active_preset_idx : 0u;
         }
         return;
     }
@@ -112,6 +202,7 @@ void oled_ui_handle_inputs(oled_ui_t *ui, int32_t enc_delta, bool enc_click, boo
             if (enc_click) {
                 ui->page = UI_PAGE_CHANNEL;
                 ui->cursor = 0u;
+                ui->editing = false;
             }
             break;
 
@@ -120,7 +211,7 @@ void oled_ui_handle_inputs(oled_ui_t *ui, int32_t enc_delta, bool enc_click, boo
                 if (enc_delta != 0) {
                     int32_t cur = (int32_t)ui->cursor + enc_delta;
                     if (cur < 0) cur = 0;
-                    if (cur > 3) cur = 3;
+                    if (cur >= (int32_t)UI_CH_PARAM_COUNT) cur = (int32_t)UI_CH_PARAM_COUNT - 1;
                     ui->cursor = (uint8_t)cur;
                 }
                 if (enc_click) {
@@ -135,22 +226,39 @@ void oled_ui_handle_inputs(oled_ui_t *ui, int32_t enc_delta, bool enc_click, boo
                         if (m < 0) m = 0;
                         if (m > (int32_t)CV_MODE_FS2_ACTION) m = (int32_t)CV_MODE_FS2_ACTION;
                         c->mode = (uint8_t)m;
+                        uint8_t smax = sub_mode_max_for(c->mode);
+                        if (c->sub_mode > smax) c->sub_mode = smax;
                     } else if (ui->cursor == 1u) {
+                        int32_t smax = (int32_t)sub_mode_max_for(c->mode);
+                        int32_t s = (int32_t)c->sub_mode + enc_delta;
+                        if (s < 0) s = 0;
+                        if (s > smax) s = smax;
+                        c->sub_mode = (uint8_t)s;
+                    } else if (ui->cursor == 2u) {
                         /* Saturate strictly to [0, 127], never & 0x7F wraparound! */
                         int32_t v = (int32_t)c->param_a + enc_delta;
                         if (v < 0) v = 0;
                         if (v > 127) v = 127;
                         c->param_a = (uint8_t)v;
-                    } else if (ui->cursor == 2u) {
+                    } else if (ui->cursor == 3u) {
+                        int32_t v = (int32_t)c->param_b + enc_delta;
+                        if (v < 0) v = 0;
+                        if (v > 127) v = 127;
+                        c->param_b = (uint8_t)v;
+                        uint16_t tens = (uint16_t)(4096u + ((uint32_t)c->param_b * 224u));
+                        eng->ch[ui->selected_ch].bezier.tension_q15 = (tens > 32767u) ? 32767u : tens;
+                    } else if (ui->cursor == 4u) {
                         int32_t s = (int32_t)c->span + enc_delta;
                         if (s < 0) s = 0;
                         if (s > (int32_t)CV_SPAN_UNI_8V) s = (int32_t)CV_SPAN_UNI_8V;
                         c->span = (uint8_t)s;
-                    } else {
+                    } else if (ui->cursor == 5u) {
                         int32_t o = (int32_t)c->offset_pct + enc_delta * 5;
                         if (o < -100) o = -100;
                         if (o > 100) o = 100;
                         c->offset_pct = (int8_t)o;
+                    } else {
+                        c->clock_sync = (enc_delta > 0) ? 1u : 0u;
                     }
                     pm->live.presets[eng->active_preset_idx] = eng->active_preset;
                     preset_mgr_mark_dirty(pm);
@@ -173,6 +281,12 @@ void oled_ui_handle_inputs(oled_ui_t *ui, int32_t enc_delta, bool enc_click, boo
                 hal_crit_enter();
                 const beads_preset_t *pr = preset_mgr_get(pm, ui->cursor);
                 cv_engine_load_preset(eng, pr, ui->cursor);
+                if (byp != NULL) {
+                    bypass_seq_set_target(byp, pr->startup_active != 0u);
+                }
+                if (midi != NULL) {
+                    midi_router_set_channel(midi, pr->midi_channel);
+                }
                 pm->live.active_preset = ui->cursor;
                 preset_mgr_mark_dirty(pm);
                 hal_crit_exit();
@@ -180,24 +294,88 @@ void oled_ui_handle_inputs(oled_ui_t *ui, int32_t enc_delta, bool enc_click, boo
             break;
 
         case UI_PAGE_SYSTEM:
-            if (enc_delta != 0) {
-                int32_t c = (int32_t)ui->cursor + enc_delta;
-                if (c < 0) c = 0;
-                if (c > 2) c = 2; /* 0=MIDI CH, 1=1V/OCT CAL, 2=USB FIRMWARE UPDATE */
-                ui->cursor = (uint8_t)c;
-            }
-            if (enc_click && ui->cursor == 2u) {
-                /* SYSTEM -> USB FIRMWARE UPDATE: enters RP2040 ROM UF2 Mass Storage! */
-                hal_reset_usb_boot(0u, 0u);
+            if (!ui->editing) {
+                if (enc_delta != 0) {
+                    int32_t c = (int32_t)ui->cursor + enc_delta;
+                    if (c < 0) c = 0;
+                    if (c > 2) c = 2; /* 0=MIDI CH, 1=1V/OCT CAL, 2=USB FIRMWARE UPDATE */
+                    ui->cursor = (uint8_t)c;
+                }
+                if (enc_click) {
+                    if (ui->cursor == 0u) {
+                        ui->editing = true;
+                    } else if (ui->cursor == 1u) {
+                        ui->editing = true;
+                        ui->cal_ch = ui->selected_ch;
+                        ui->cal_oct = 2u; /* Start on C2 (0.00V) */
+                        hal_crit_enter();
+                        eng->cal_override_active = true;
+                        eng->cal_override_ch = ui->cal_ch;
+                        eng->cal_override_code = eng->cal.oct_dac[ui->cal_ch][ui->cal_oct];
+                        hal_crit_exit();
+                    } else if (ui->cursor == 2u) {
+                        /* SYSTEM -> USB FIRMWARE UPDATE: enters RP2040 ROM UF2 Mass Storage! */
+                        hal_reset_usb_boot(0u, 0u);
+                    }
+                }
+            } else if (ui->cursor == 0u) {
+                /* Interactive MIDI CHANNEL editor (0=OMNI, 1..16) */
+                if (enc_delta != 0) {
+                    hal_crit_enter();
+                    int32_t mch = (int32_t)eng->active_preset.midi_channel + enc_delta;
+                    if (mch < 0) mch = 0;
+                    if (mch > 16) mch = 16;
+                    eng->active_preset.midi_channel = (uint8_t)mch;
+                    pm->live.presets[eng->active_preset_idx].midi_channel = (uint8_t)mch;
+                    if (midi != NULL) {
+                        midi_router_set_channel(midi, (uint8_t)mch);
+                    }
+                    preset_mgr_mark_dirty(pm);
+                    hal_crit_exit();
+                }
+                if (enc_click) {
+                    ui->editing = false;
+                }
+            } else if (ui->cursor == 1u) {
+                /* Interactive 1V/OCT CALIB knot trimmer (click advances octave/ch, BACK exits) */
+                if (enc_delta != 0) {
+                    hal_crit_enter();
+                    int32_t code = (int32_t)eng->cal.oct_dac[ui->cal_ch][ui->cal_oct] + enc_delta;
+                    if (code < 0) code = 0;
+                    if (code > 4095) code = 4095;
+                    eng->cal.oct_dac[ui->cal_ch][ui->cal_oct] = (uint16_t)code;
+                    pm->live.cal.oct_dac[ui->cal_ch][ui->cal_oct] = (uint16_t)code;
+                    eng->cal_override_active = true;
+                    eng->cal_override_ch = ui->cal_ch;
+                    eng->cal_override_code = (uint16_t)code;
+                    preset_mgr_mark_dirty(pm);
+                    hal_crit_exit();
+                }
+                if (enc_click) {
+                    ui->cal_oct++;
+                    if (ui->cal_oct >= BEADS_CAL_OCTAVES) {
+                        ui->cal_oct = 0u;
+                        ui->cal_ch++;
+                        if (ui->cal_ch >= BEADS_NUM_CV_CHANNELS) {
+                            ui->cal_ch = 0u;
+                        }
+                    }
+                    hal_crit_enter();
+                    eng->cal_override_active = true;
+                    eng->cal_override_ch = ui->cal_ch;
+                    eng->cal_override_code = eng->cal.oct_dac[ui->cal_ch][ui->cal_oct];
+                    hal_crit_exit();
+                }
             }
             break;
     }
 }
 
-void oled_ui_render(oled_ui_t *ui, const cv_engine_t *eng, const bypass_seq_t *byp, bool usb_connected) {
+void oled_ui_render(oled_ui_t *ui, const cv_engine_t *eng, const bypass_seq_t *byp,
+                    const preset_mgr_t *pm, bool usb_connected) {
     memset(ui->fb, 0, sizeof(ui->fb));
 
-    /* Top status bar (Y = 0..11): Active/Bypass indicator + USB badge + selected channel marker */
+    /* Top status bar (Y = 0..11): Active/Bypass indicator + USB badge */
     for (uint8_t x = 0u; x < OLED_WIDTH; x++) {
         fb_set_pixel(ui, x, 11u);
     }
@@ -214,24 +392,27 @@ void oled_ui_render(oled_ui_t *ui, const cv_engine_t *eng, const bypass_seq_t *b
 
     /* Record oscilloscope trace for selected CV channel */
     int32_t q15 = eng->ch[ui->selected_ch].scope_val_q15;
-    /* Map [-32767..+32767] -> Y in [60..16] */
     int32_t py = 38 - ((q15 * 22) >> 15);
     if (py < 14) py = 14;
     if (py > 61) py = 61;
     ui->scope_hist[ui->scope_head] = (uint8_t)py;
     ui->scope_head = (uint8_t)((ui->scope_head + 1u) & (OLED_WIDTH - 1u));
 
+    char buf[16];
     if (ui->page == UI_PAGE_SCOPE) {
-        /* Center 0V dashed horizon at Y=38 */
+        const cv_channel_cfg_t *c = &eng->active_preset.ch[ui->selected_ch];
+        char hdr[18] = "CV1 ";
+        hdr[2] = (char)('1' + ui->selected_ch);
+        strcpy(&hdr[4], (c->mode < 10u) ? MODE_NAMES[c->mode] : "CV");
+        fb_draw_str(ui, 16u, 2u, hdr);
+
         for (uint8_t x = 0u; x < OLED_WIDTH; x += 4u) {
             fb_set_pixel(ui, x, 38u);
         }
-        /* Draw scrolling waveform */
         for (uint8_t x = 0u; x < OLED_WIDTH; x++) {
             uint8_t idx = (uint8_t)((ui->scope_head + x) & (OLED_WIDTH - 1u));
             fb_set_pixel(ui, x, ui->scope_hist[idx]);
         }
-        /* Draw 8-channel mini bar meters along bottom 3 pixels */
         for (uint8_t ch = 0u; ch < BEADS_NUM_CV_CHANNELS; ch++) {
             uint8_t bx = (uint8_t)(ch * 16u + 1u);
             uint8_t bw = (uint8_t)((eng->ch[ch].last_out_code >> 8u) & 0x0Fu);
@@ -240,28 +421,107 @@ void oled_ui_render(oled_ui_t *ui, const cv_engine_t *eng, const bypass_seq_t *b
             }
         }
     } else if (ui->page == UI_PAGE_CHANNEL) {
-        fb_draw_str(ui, 16u, 2u, "CH EDIT");
-        fb_draw_str(ui, 8u, 17u, "MODE");
-        fb_draw_str(ui, 8u, 29u, "RATE/CC");
-        fb_draw_str(ui, 8u, 41u, "SPAN");
-        fb_draw_str(ui, 8u, 53u, "OFFSET");
-        uint8_t row_y = (uint8_t)(15u + ui->cursor * 12u);
-        for (uint8_t x = 2u; x < 126u; x++) {
-            fb_set_pixel(ui, x, row_y);
-            fb_set_pixel(ui, x, (uint8_t)(row_y + 9u));
+        const cv_channel_cfg_t *c = &eng->active_preset.ch[ui->selected_ch];
+        char hdr[16] = "CH1 EDIT";
+        hdr[2] = (char)('1' + ui->selected_ch);
+        if (ui->editing) strcpy(&hdr[8], " *");
+        fb_draw_str(ui, 16u, 2u, hdr);
+
+        /* Scrollable 4-row window over 7 channel parameters (0..6) */
+        uint8_t first_row = (ui->cursor >= 4u) ? (uint8_t)(ui->cursor - 3u) : 0u;
+        for (uint8_t vis = 0u; vis < 4u; vis++) {
+            uint8_t r = (uint8_t)(first_row + vis);
+            if (r >= UI_CH_PARAM_COUNT) break;
+            uint8_t y = (uint8_t)(17u + vis * 12u);
+            const char *lbl = "";
+            buf[0] = '\0';
+            switch (r) {
+                case 0u:
+                    lbl = "MODE";
+                    strcpy(buf, (c->mode < 10u) ? MODE_NAMES[c->mode] : "?");
+                    break;
+                case 1u:
+                    lbl = "SUB";
+                    fmt_sub_mode(buf, c);
+                    break;
+                case 2u:
+                    lbl = "PAR A";
+                    fmt_u16(buf, c->param_a, 1u);
+                    break;
+                case 3u:
+                    lbl = "PAR B";
+                    fmt_u16(buf, c->param_b, 1u);
+                    break;
+                case 4u:
+                    lbl = "SPAN";
+                    strcpy(buf, (c->span < 5u) ? SPAN_NAMES[c->span] : "?");
+                    break;
+                case 5u:
+                    lbl = "OFFS";
+                    fmt_i8_pct(buf, c->offset_pct);
+                    break;
+                default:
+                    lbl = "SYNC";
+                    strcpy(buf, (c->clock_sync != 0u) ? "CLK" : "FREE");
+                    break;
+            }
+            fb_draw_str(ui, 6u, y, lbl);
+            fb_draw_str(ui, 56u, y, buf);
+            if (r == ui->cursor) {
+                uint8_t box_y = (uint8_t)(y - 2u);
+                for (uint8_t x = 2u; x < 126u; x++) {
+                    fb_set_pixel(ui, x, box_y);
+                    fb_set_pixel(ui, x, (uint8_t)(box_y + 9u));
+                }
+            }
         }
     } else if (ui->page == UI_PAGE_PRESET) {
         fb_draw_str(ui, 16u, 2u, "PRESET RECALL");
-        fb_draw_str(ui, 8u, 22u, eng->active_preset.name);
+        /* Display HOVERED preset (ui->cursor) rather than active_preset! */
+        const beads_preset_t *hov = (pm != NULL) ? preset_mgr_get(pm, ui->cursor) : &eng->active_preset;
+        char slot_str[16];
+        slot_str[0] = 'P';
+        fmt_u16(&slot_str[1], ui->cursor, 2u);
+        slot_str[3] = (ui->cursor == eng->active_preset_idx) ? '*' : ' ';
+        slot_str[4] = '\0';
+        fb_draw_str(ui, 8u, 18u, slot_str);
+
+        char name_z[13];
+        memcpy(name_z, hov->name, 12u);
+        name_z[12] = '\0';
+        fb_draw_str(ui, 36u, 18u, name_z);
+
+        fb_draw_str(ui, 8u, 36u, (hov->startup_active != 0u) ? "BOOT: ACTIVE" : "BOOT: BYPASS");
         for (uint8_t x = 2u; x < 126u; x++) {
-            fb_set_pixel(ui, x, 19u);
-            fb_set_pixel(ui, x, 31u);
+            fb_set_pixel(ui, x, 15u);
+            fb_set_pixel(ui, x, 27u);
         }
     } else {
-        fb_draw_str(ui, 16u, 2u, "SYSTEM MENU");
-        fb_draw_str(ui, 8u, 17u, "MIDI CHANNEL");
-        fb_draw_str(ui, 8u, 29u, "1V/OCT CALIB");
-        fb_draw_str(ui, 8u, 41u, "USB FIRMWARE UPD");
+        fb_draw_str(ui, 16u, 2u, ui->editing ? "SYSTEM EDIT *" : "SYSTEM MENU");
+        /* Row 0: MIDI CHANNEL + live value */
+        fb_draw_str(ui, 6u, 17u, "MIDI CH");
+        if (eng->active_preset.midi_channel == 0u) {
+            strcpy(buf, "OMNI");
+        } else {
+            fmt_u16(buf, eng->active_preset.midi_channel, 2u);
+        }
+        fb_draw_str(ui, 72u, 17u, buf);
+
+        /* Row 1: 1V/OCT CALIB + live channel/octave/DAC code */
+        fb_draw_str(ui, 6u, 29u, "1V/OCT");
+        if (ui->editing && ui->cursor == 1u) {
+            buf[0] = 'C'; buf[1] = (char)('1' + ui->cal_ch);
+            buf[2] = 'O'; buf[3] = (char)('0' + ui->cal_oct);
+            buf[4] = ':';
+            fmt_u16(&buf[5], eng->cal.oct_dac[ui->cal_ch][ui->cal_oct], 4u);
+            fb_draw_str(ui, 54u, 29u, buf);
+        } else {
+            fb_draw_str(ui, 54u, 29u, "CALIB");
+        }
+
+        /* Row 2: USB FIRMWARE UPDATE */
+        fb_draw_str(ui, 6u, 41u, "USB FW UPDATE");
+
         uint8_t row_y = (uint8_t)(15u + ui->cursor * 12u);
         for (uint8_t x = 2u; x < 126u; x++) {
             fb_set_pixel(ui, x, row_y);

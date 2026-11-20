@@ -8600,7 +8600,7 @@
 				)
 			)
 		)
-		(property "Value" "18k"
+		(property "Value" "33k"
 			(at 17.78 247.65 0)
 			(effects
 				(font
@@ -9029,7 +9029,7 @@
 				)
 			)
 		)
-		(property "Value" "22k"
+		(property "Value" "10k"
 			(at 64.77 242.57 0)
 			(effects
 				(font
