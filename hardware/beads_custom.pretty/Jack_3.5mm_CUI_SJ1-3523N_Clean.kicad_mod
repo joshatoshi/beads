@@ -1,120 +1,157 @@
 (footprint "Jack_3.5mm_CUI_SJ1-3523N_Clean"
-  (version 20241229)
-  (generator "kicad-mcp")
-  (generator_version "9.0")
-  (layer "F.Cu")
-  (descr "Same Sky / CUI SJ1-3523N Horizontal 3.5mm TRS Jack (no internal Edge.Cuts, silkscreen clear of holes & edge)")
-  (tags "CUI SameSky SJ1-3523N TRS MIDI jack")
-
-  (property "Reference" "REF**" (at 0 -9 0)
-    (layer "F.SilkS")
-    (uuid "9746a7de-0027-4c0f-b94a-35015633c32e")
-    (effects (font (size 1 1) (thickness 0.15)))
-  )
-  (property "Value" "Jack_3.5mm_CUI_SJ1-3523N_Clean" (at 0 1 0)
-    (layer "F.Fab")
-    (uuid "9ded06e8-cab4-4e7d-94c6-704e64740838")
-    (effects (font (size 1 1) (thickness 0.15)))
-  )
-  (property "Datasheet" "" (at 0 0 0)
-    (layer "F.Fab")
-    (uuid "ab2a1e21-d5fd-431a-b1ac-45f5bcd85d07")
-    (effects (font (size 1 1) (thickness 0.15)))
-  )
-
-  (fp_rect
-    (start -6.25 -7.95)
-    (end 6.25 6.55)
-    (stroke (width 0.05) (type default))
-    (fill none)
-    (layer "F.CrtYd")
-    (uuid "93d92978-a9f4-471a-af63-d8e10db0b0e5")
-  )
-
-  (fp_rect
-    (start -6.1 -7.8)
-    (end 6.1 1.5)
-    (stroke (width 0.12) (type default))
-    (fill none)
-    (layer "F.SilkS")
-    (uuid "0c55cb05-a343-46e5-9031-568b38d39bb7")
-  )
-
-  (fp_rect
-    (start -6 -7.7)
-    (end 6 6.3)
-    (stroke (width 0.1) (type default))
-    (fill none)
-    (layer "F.Fab")
-    (uuid "3fdef2e7-f920-4a45-a5bc-2944809bf044")
-  )
-
-  (pad "S" thru_hole oval
-    (at 0 0)
-    (size 2.2 1.2)
-    (drill oval 1.4 0.4)
-    (layers "*.Cu" "*.Mask")
-    (uuid "ebff0797-a336-4f9d-aa12-3bf6fa4b2b65")
-  )
-
-  (pad "R" thru_hole oval
-    (at -5 -5)
-    (size 1.2 2.2)
-    (drill oval 0.4 1.4)
-    (layers "*.Cu" "*.Mask")
-    (uuid "7c522bbb-74e1-402c-9be0-0c573740a3a3")
-  )
-
-  (pad "T" thru_hole oval
-    (at 5 -5)
-    (size 1.2 2.2)
-    (drill oval 0.4 1.4)
-    (layers "*.Cu" "*.Mask")
-    (uuid "d45db341-04ed-41f6-a3c3-fb16cb054709")
-  )
-
-  (pad "" np_thru_hole circle
-    (at -5 0)
-    (size 1.2 1.2)
-    (drill 1.2)
-    (layers "*.Cu" "*.Mask")
-    (uuid "2faf09b7-24fd-44da-8ecb-4d215e1c2994")
-  )
-
-  (pad "" np_thru_hole circle
-    (at -5 2.5)
-    (size 1.2 1.2)
-    (drill 1.2)
-    (layers "*.Cu" "*.Mask")
-    (uuid "78f16f8c-76b9-4c8c-bcdb-b138e43698b2")
-  )
-
-  (pad "" np_thru_hole circle
-    (at 0 -5)
-    (size 1.2 1.2)
-    (drill 1.2)
-    (layers "*.Cu" "*.Mask")
-    (uuid "d58c8842-4a79-489d-968d-4862cd8831cf")
-  )
-
-  (pad "" np_thru_hole circle
-    (at 5 0)
-    (size 1.2 1.2)
-    (drill 1.2)
-    (layers "*.Cu" "*.Mask")
-    (uuid "0661cd4a-5aac-4d4f-99f2-4fa21c58aadd")
-  )
-
-  (pad "" np_thru_hole circle
-    (at 5 2.5)
-    (size 1.2 1.2)
-    (drill 1.2)
-    (layers "*.Cu" "*.Mask")
-    (uuid "6b7af6ca-197f-4698-ad78-aa37f8a13782")
-  )
-  (model "${KIPRJMOD}/../beads_custom.3dshapes/Jack_3.5mm_CUI_SJ1-3523N.step"
-    (offset (xyz 0 0 0))
-    (scale (xyz 1 1 1))
-    (rotate (xyz 0 0 0))
-  )
+	(version 20241229)
+	(generator "pcbnew")
+	(generator_version "9.0")
+	(layer "F.Cu")
+	(descr "Same Sky / CUI SJ1-3523N Horizontal 3.5mm TRS Jack (no internal Edge.Cuts, silkscreen clear of holes & edge)")
+	(tags "CUI SameSky SJ1-3523N TRS MIDI jack")
+	(property "Reference" "REF**"
+		(at 0 -9 0)
+		(layer "F.SilkS")
+		(uuid "2612d51c-6bd9-48ac-a818-939859948912")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "Jack_3.5mm_CUI_SJ1-3523N_Clean"
+		(at 0 1 0)
+		(layer "F.Fab")
+		(uuid "8fe35d95-9489-45d7-95f3-94e5cc8f47ae")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(uuid "d929edff-d286-4168-8b22-f3404b89691f")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "5e0242f5-e22a-4653-b718-8a30ef0cf44b")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(fp_rect
+		(start -6.1 -7.8)
+		(end 6.1 1.5)
+		(stroke
+			(width 0.12)
+			(type default)
+		)
+		(fill no)
+		(layer "F.SilkS")
+		(uuid "0165ede1-c8ed-4bfd-85c9-18a306afcc6e")
+	)
+	(fp_rect
+		(start -6.25 -7.95)
+		(end 6.25 6.55)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+		(uuid "3b936d74-cf71-4f0f-abab-91bafd39be83")
+	)
+	(fp_rect
+		(start -6 -7.7)
+		(end 6 6.3)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(fill no)
+		(layer "F.Fab")
+		(uuid "2c1e64e2-08c5-4412-88e2-0a74ae4c0cde")
+	)
+	(pad "" np_thru_hole circle
+		(at -5 0)
+		(size 1.2 1.2)
+		(drill 1.2)
+		(layers "*.Cu" "*.Mask")
+		(uuid "3ab63c48-91b3-4cfc-92b2-b7dd12f2871c")
+	)
+	(pad "" np_thru_hole circle
+		(at -5 2.5)
+		(size 1.2 1.2)
+		(drill 1.2)
+		(layers "*.Cu" "*.Mask")
+		(uuid "8e4d9185-81b2-420b-a7fe-538ed27a4f4a")
+	)
+	(pad "" np_thru_hole circle
+		(at 0 -5)
+		(size 1.2 1.2)
+		(drill 1.2)
+		(layers "*.Cu" "*.Mask")
+		(uuid "3524f847-cf6c-4a90-9b09-b07c3cc17f99")
+	)
+	(pad "" np_thru_hole circle
+		(at 5 0)
+		(size 1.2 1.2)
+		(drill 1.2)
+		(layers "*.Cu" "*.Mask")
+		(uuid "f22290ad-cd43-4cb8-9656-b82b8177eb86")
+	)
+	(pad "" np_thru_hole circle
+		(at 5 2.5)
+		(size 1.2 1.2)
+		(drill 1.2)
+		(layers "*.Cu" "*.Mask")
+		(uuid "28b3b5f3-58c9-454e-b529-3c181eef34a8")
+	)
+	(pad "R" thru_hole oval
+		(at -5 -5)
+		(size 1.6 2.4)
+		(drill oval 0.8 1.6)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "b0826083-4486-4b6f-9c88-701c9767c75e")
+	)
+	(pad "S" thru_hole oval
+		(at 0 0)
+		(size 2.4 1.6)
+		(drill oval 1.6 0.8)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "7a6f16dd-2058-423c-862c-1aba0d252122")
+	)
+	(pad "T" thru_hole oval
+		(at 5 -5)
+		(size 1.6 2.4)
+		(drill oval 0.8 1.6)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "8ec326cd-dce4-4e07-908f-8a1ca75ec0db")
+	)
+	(embedded_fonts no)
+	(model "${KIPRJMOD}/../beads_custom.3dshapes/Jack_3.5mm_CUI_SJ1-3523N.step"
+		(offset
+			(xyz 0 0 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 0)
+		)
+	)
 )

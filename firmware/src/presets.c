@@ -124,40 +124,59 @@ const beads_preset_t *preset_mgr_get(const preset_mgr_t *pm, uint8_t idx) {
     return &pm->live.presets[idx];
 }
 
-bool preset_mgr_save_if_safe(preset_mgr_t *pm, bool bypass_idle, uint32_t now_ms, uint32_t last_non_rt_midi_ms) {
-    static beads_nvm_block_t frozen_snap;
+/* Static frozen staging snapshot (avoids 2740 B stack allocation on Core 1!) */
+static beads_nvm_block_t s_frozen_snap;
+
+bool preset_mgr_try_stage_locked(preset_mgr_t *pm, bool bypass_idle, uint32_t now_ms,
+                                 uint32_t last_non_rt_midi_ms, uint32_t *out_slot) {
     if (!pm->dirty) {
         return false;
     }
-    /* Mandatory idle-deferred guard: ONLY erase/program QSPI Flash during BYP_STATE_IDLE
-     * AND >= 300 ms of non-realtime MIDI silence! */
+    /* Mandatory idle-deferred guard: ONLY stage QSPI Flash during BYP_STATE_IDLE
+     * (with target_active == current_active) AND >= 300 ms of non-realtime MIDI silence!
+     * Signed modular difference prevents unsigned wraparound bypass if now_ms < last_non_rt! */
     if (!bypass_idle) {
         return false;
     }
-    if ((uint32_t)(now_ms - last_non_rt_midi_ms) < 300u) {
+    if ((int32_t)(now_ms - last_non_rt_midi_ms) < 300) {
         return false;
     }
 
-    /* Take a frozen snapshot under critical section so torn writes can NEVER occur! */
-    hal_crit_enter();
-    memset(&frozen_snap, 0, sizeof(frozen_snap));
-    frozen_snap = pm->live;
+    memset(&s_frozen_snap, 0, sizeof(s_frozen_snap));
+    s_frozen_snap = pm->live;
     pm->last_write_seq++;
-    frozen_snap.magic = BEADS_NVM_MAGIC;
-    frozen_snap.version = BEADS_NVM_VERSION;
-    frozen_snap.write_seq = pm->last_write_seq;
-    frozen_snap.reserved_pad = 0u;
-    frozen_snap.crc32 = compute_block_crc(&frozen_snap);
-    pm->live.write_seq = frozen_snap.write_seq;
-    pm->live.crc32 = frozen_snap.crc32;
+    s_frozen_snap.magic = BEADS_NVM_MAGIC;
+    s_frozen_snap.version = BEADS_NVM_VERSION;
+    s_frozen_snap.write_seq = pm->last_write_seq;
+    s_frozen_snap.reserved_pad = 0u;
+    s_frozen_snap.crc32 = compute_block_crc(&s_frozen_snap);
+    pm->live.write_seq = s_frozen_snap.write_seq;
+    pm->live.crc32 = s_frozen_snap.crc32;
     pm->dirty = false;
-    hal_crit_exit();
+    *out_slot = pm->next_slot & 1u;
+    return true;
+}
 
-    uint32_t slot = pm->next_slot & 1u;
-    if (!hal_flash_erase_and_program(slot, &frozen_snap, sizeof(frozen_snap))) {
+bool preset_mgr_commit_staged(preset_mgr_t *pm, uint32_t slot) {
+    if (!hal_flash_erase_and_program(slot, &s_frozen_snap, sizeof(s_frozen_snap))) {
+        hal_crit_enter();
         pm->dirty = true;
+        hal_crit_exit();
         return false;
     }
+    hal_crit_enter();
     pm->next_slot = slot ^ 1u;
+    hal_crit_exit();
     return true;
+}
+
+bool preset_mgr_save_if_safe(preset_mgr_t *pm, bool bypass_idle, uint32_t now_ms, uint32_t last_non_rt_midi_ms) {
+    uint32_t slot = 0u;
+    hal_crit_enter();
+    bool staged = preset_mgr_try_stage_locked(pm, bypass_idle, now_ms, last_non_rt_midi_ms, &slot);
+    hal_crit_exit();
+    if (!staged) {
+        return false;
+    }
+    return preset_mgr_commit_staged(pm, slot);
 }

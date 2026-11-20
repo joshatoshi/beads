@@ -91,9 +91,10 @@ def build_all_custom_3dshapes() -> list[pathlib.Path]:
     exported.append(export_model("SOP-4_TLP172AM", bd.Pos(0.0, 0.0, 1.05) * bd.Box(3.90, 4.40, 2.10)))
     exported.append(export_model("SW_Push_TS-1088_4x3mm", bd.Pos(0.0, 0.0, 1.00) * bd.Box(4.00, 3.00, 2.00)))
 
-    # BTB Socket 2x08 Bottom-Mate (mounted on B.Cu of ui_mezzanine, hangs -8.51mm in -Z_3d!)
-    # KiCad rot=0: Pin1=(0,0), Pin2=(2.54,0) ... Pin16=(2.54, 17.78) -> center (1.27, -8.89)
-    btb_sock = bd.Pos(1.27, -8.89, -1.60 - 4.255) * bd.Box(5.08, 20.50, 8.51)
+    # BTB Socket 2x08 Bottom-Mate (authored on F.Cu with even pins at X=-2.54 -> center X=-1.27,
+    # Y_3d=-8.89, Z=+4.255 so when KiCad flips the footprint onto B.Cu on ui_mezzanine.kicad_pcb,
+    # it renders strictly BELOW B.Cu at Z=[-8.51, 0.00] mm centered 0.000 mm on all 16 pins!)
+    btb_sock = bd.Pos(-1.27, -8.89, 4.255) * bd.Box(5.08, 20.50, 8.51)
     exported.append(export_model("BTB_Socket_2x08_BottomMate", btb_sock))
 
     # SolderJumper_OLED_RevPWR (flat copper feature)

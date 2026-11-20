@@ -187,7 +187,8 @@ void hal_reset_usb_boot(uint32_t usb_activity_gpio_pin_mask, uint32_t disable_in
  * ============================================================================ */
 #include "hardware/resets.h"
 
-static usb_ep0_state_t s_ep0;
+static usb_ep0_state_t  s_ep0;
+static usb_vbus_state_t s_usb_vbus;
 static uint8_t s_ep1_pid = 0u;
 static uint8_t s_ep3_out_pid = 0u;
 static uint8_t s_usb_midi_rx_q[64];
@@ -268,11 +269,106 @@ static const usb_ep0_hw_t SDK_USB_EP0_HW = {
     .ctx               = NULL,
 };
 
+static bool sdk_usb_read_vbus_det(void *ctx) {
+    (void)ctx;
+    return hal_gpio_read(PIN_VBUS_DET);
+}
+
+static bool sdk_usb_is_suspended(void *ctx) {
+    (void)ctx;
+    /* RP2040 USB_SIE_STATUS.SUSPENDED (bit 4) is WC (Write-1-to-Clear) and latches 3 ms after
+     * attach during USB 2.0 T_ATTDB pre-reset idle. Clear SUSPENDED & RESUME whenever a 1 kHz
+     * SOF (USB_INTR.DEV_SOF, cleared by reading SOF_RD) or bus activity arrives! */
+    if ((usb_hw->intr & USB_INTR_DEV_SOF_BITS) != 0u) {
+        (void)usb_hw->sof_rd;
+        usb_hw->sie_status = USB_SIE_STATUS_SUSPENDED_BITS | USB_SIE_STATUS_RESUME_BITS;
+        return false;
+    }
+    uint32_t sie = usb_hw->sie_status;
+    if ((sie & (USB_SIE_STATUS_BUS_RESET_BITS | USB_SIE_STATUS_SETUP_REC_BITS | USB_SIE_STATUS_RESUME_BITS)) != 0u ||
+        usb_hw->buf_status != 0u) {
+        usb_hw->sie_status = USB_SIE_STATUS_SUSPENDED_BITS | USB_SIE_STATUS_RESUME_BITS;
+        return false;
+    }
+    return (sie & USB_SIE_STATUS_SUSPENDED_BITS) != 0u;
+}
+
+static uint32_t sdk_usb_time_us_32(void *ctx) {
+    (void)ctx;
+    return time_us_32();
+}
+
+static void sdk_usb_delay_us(void *ctx, uint32_t us) {
+    (void)ctx;
+    sleep_us(us);
+}
+
+static void sdk_usb_set_pullup(void *ctx, bool en) {
+    (void)ctx;
+    if (en) {
+        usb_hw->sie_ctrl |= USB_SIE_CTRL_PULLUP_EN_BITS;
+    } else {
+        usb_hw->sie_ctrl &= ~USB_SIE_CTRL_PULLUP_EN_BITS;
+    }
+}
+
+static void sdk_usb_on_attach(void *ctx) {
+    (void)ctx;
+    usb_hw->dev_addr_ctrl = 0u;
+    usb_ep0_bus_reset(&s_ep0);
+    s_ep1_pid = 0u;
+    s_ep3_out_pid = 0u;
+    s_usb_midi_q_len = 0u;
+    s_usb_midi_q_pos = 0u;
+    (void)usb_hw->sof_rd;
+    usb_hw->buf_status = 0xFFFFFFFFu;
+    usb_hw->sie_status = USB_SIE_STATUS_BUS_RESET_BITS | USB_SIE_STATUS_SETUP_REC_BITS |
+                         USB_SIE_STATUS_CONNECTED_BITS | USB_SIE_STATUS_SUSPENDED_BITS |
+                         USB_SIE_STATUS_RESUME_BITS;
+    sdk_ep1_out_arm(0u);
+    sdk_ep3_out_arm(0u);
+    usb_hw->pwr = USB_USB_PWR_VBUS_DETECT_BITS | USB_USB_PWR_VBUS_DETECT_OVERRIDE_EN_BITS;
+    usb_hw->sie_ctrl |= USB_SIE_CTRL_PULLUP_EN_BITS;
+}
+
+static void sdk_usb_on_detach(void *ctx) {
+    (void)ctx;
+    usb_hw->sie_ctrl &= ~USB_SIE_CTRL_PULLUP_EN_BITS;
+    usb_hw->pwr = USB_USB_PWR_VBUS_DETECT_OVERRIDE_EN_BITS; /* VBUS_DETECT = 0 */
+    usb_hw->dev_addr_ctrl = 0u;
+    usb_ep0_bus_reset(&s_ep0);
+    s_ep1_pid = 0u;
+    s_ep3_out_pid = 0u;
+    s_usb_midi_q_len = 0u;
+    s_usb_midi_q_pos = 0u;
+    usb_dpram->ep_buf_ctrl[0].in  = 0u;
+    usb_dpram->ep_buf_ctrl[0].out = 0u;
+    usb_dpram->ep_buf_ctrl[1].out = 0u;
+    usb_dpram->ep_buf_ctrl[3].out = 0u;
+    (void)usb_hw->sof_rd;
+    usb_hw->buf_status = 0xFFFFFFFFu;
+    usb_hw->sie_status = USB_SIE_STATUS_BUS_RESET_BITS | USB_SIE_STATUS_SETUP_REC_BITS |
+                         USB_SIE_STATUS_CONNECTED_BITS | USB_SIE_STATUS_SUSPENDED_BITS |
+                         USB_SIE_STATUS_RESUME_BITS;
+}
+
+static const usb_vbus_hw_t SDK_USB_VBUS_HW = {
+    .read_vbus_det = sdk_usb_read_vbus_det,
+    .is_suspended  = sdk_usb_is_suspended,
+    .time_us_32    = sdk_usb_time_us_32,
+    .delay_us      = sdk_usb_delay_us,
+    .set_pullup    = sdk_usb_set_pullup,
+    .on_attach     = sdk_usb_on_attach,
+    .on_detach     = sdk_usb_on_detach,
+    .ctx           = NULL,
+};
+
 void hal_usb_init_on_core1(void) {
     reset_block(RESETS_RESET_USBCTRL_BITS);
     unreset_block_wait(RESETS_RESET_USBCTRL_BITS);
 
     usb_ep0_init(&s_ep0);
+    usb_vbus_init(&s_usb_vbus);
     s_ep1_pid = 0u;
     s_ep3_out_pid = 0u;
     s_usb_midi_q_len = 0u;
@@ -280,7 +376,9 @@ void hal_usb_init_on_core1(void) {
 
     memset(usb_dpram, 0, sizeof(*usb_dpram));
     usb_hw->muxing    = USB_USB_MUXING_TO_PHY_BITS | USB_USB_MUXING_SOFTCON_BITS;
-    usb_hw->pwr       = USB_USB_PWR_VBUS_DETECT_BITS | USB_USB_PWR_VBUS_DETECT_OVERRIDE_EN_BITS;
+    /* Start with VBUS_DETECT = 0 & PULLUP_EN = 0 so +3.3V D+ pull-up NEVER back-feeds
+     * SRV05-4 -> J_USB.VBUS into powered-off (0V) hosts! Gated dynamically by PIN_VBUS_DET. */
+    usb_hw->pwr       = USB_USB_PWR_VBUS_DETECT_OVERRIDE_EN_BITS;
     usb_hw->main_ctrl = USB_MAIN_CTRL_CONTROLLER_EN_BITS;
     usb_hw->sie_ctrl  = USB_SIE_CTRL_EP0_INT_1BUF_BITS;
 
@@ -288,20 +386,26 @@ void hal_usb_init_on_core1(void) {
     usb_dpram->ep_ctrl[1].in  = EP_CTRL_ENABLE_BITS | EP_CTRL_INTERRUPT_PER_BUFFER | (3u << EP_CTRL_BUFFER_TYPE_LSB) | 0x0200u; /* EP2 IN  */
     usb_dpram->ep_ctrl[2].out = EP_CTRL_ENABLE_BITS | EP_CTRL_INTERRUPT_PER_BUFFER | (2u << EP_CTRL_BUFFER_TYPE_LSB) | 0x0240u; /* EP3 OUT */
     usb_dpram->ep_ctrl[2].in  = EP_CTRL_ENABLE_BITS | EP_CTRL_INTERRUPT_PER_BUFFER | (2u << EP_CTRL_BUFFER_TYPE_LSB) | 0x0280u; /* EP3 IN  */
-    sdk_ep1_out_arm(0u);
-    sdk_ep3_out_arm(0u);
 
-    usb_hw->sie_ctrl |= USB_SIE_CTRL_PULLUP_EN_BITS;
+    /* Dynamically assert VBUS_DETECT & PULLUP_EN ONLY when PIN_VBUS_DET is HIGH */
+    (void)usb_vbus_sync(&s_usb_vbus, &SDK_USB_VBUS_HW);
 }
 
 void hal_usb_task_on_core1(void) {
+    /* Dynamically gate PULLUP_EN & VBUS_DETECT on PIN_VBUS_DET (with SUSPENDED latch-break probe) */
+    if (!usb_vbus_sync(&s_usb_vbus, &SDK_USB_VBUS_HW)) {
+        return;
+    }
+
     uint32_t sie = usb_hw->sie_status;
     if ((sie & USB_SIE_STATUS_BUS_RESET_BITS) != 0u) {
-        usb_hw->sie_status = USB_SIE_STATUS_BUS_RESET_BITS;
+        (void)usb_hw->sof_rd;
+        usb_hw->sie_status = USB_SIE_STATUS_BUS_RESET_BITS | USB_SIE_STATUS_SUSPENDED_BITS | USB_SIE_STATUS_RESUME_BITS;
         usb_hw->dev_addr_ctrl = 0u;
         usb_ep0_bus_reset(&s_ep0);
         s_ep1_pid = 0u;
         s_ep3_out_pid = 0u;
+        s_usb_vbus.last_probe_us = time_us_32();
         sdk_ep1_out_arm(0u);
         sdk_ep3_out_arm(0u);
     }

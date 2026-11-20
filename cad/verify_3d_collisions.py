@@ -77,7 +77,29 @@ def main() -> int:
 
     step_shapes = list(shapes_dir.glob("*.step"))
     assert len(step_shapes) >= 17, f"Expected >= 17 local STEP models in {shapes_dir}, found {len(step_shapes)}"
-    print(f"[PASS] Gate 5.1: All {len(required_exports)} CAD STL/STEP/PNG exports & {len(step_shapes)} local 3D STEP models verified")
+
+    # Verify kicad-cli STEP export on ui_mezzanine places both B.Cu J_BTB_* sockets strictly at Z < 0 with 0.00mm XY error!
+    import subprocess
+    tmp_dir = pathlib.Path("/tmp/opencode")
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    mz_step = tmp_dir / "beads_ui_mezzanine_verify.step"
+    subprocess.run(
+        ["kicad-cli", "pcb", "export", "step", "--subst-models", "-f", "-o", str(mz_step),
+         str(ROOT / "hardware" / "ui_mezzanine" / "ui_mezzanine.kicad_pcb")],
+        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    mz_shp = bd.import_step(str(mz_step))
+    mz_step.unlink(missing_ok=True)
+    btb_step_solids = [
+        sol for sol in mz_shp.solids()
+        if sol.bounding_box().max.Z < 0.0 and (sol.bounding_box().max.Y - sol.bounding_box().min.Y) > 19.0
+    ]
+    assert len(btb_step_solids) == 2, f"Expected 2 B.Cu BTB socket solids at Z < 0 in ui_mezzanine STEP, got {len(btb_step_solids)}"
+    btb_x_centers = sorted((s.bounding_box().min.X + s.bounding_box().max.X) / 2.0 for s in btb_step_solids)
+    assert abs(btb_x_centers[0] - 23.25) < 0.05 and abs(btb_x_centers[1] - 46.25) < 0.05, (
+        f"BTB_Socket_2x08_BottomMate X centers shifted in ui_mezzanine STEP: {btb_x_centers}"
+    )
+    print(f"[PASS] Gate 5.1: All {len(required_exports)} CAD STL/STEP/PNG exports, {len(step_shapes)} local 3D STEP models & B.Cu BTB Z<0 verified")
 
     # 2. Verify raw print-ready enclosure_shell & bottom_lid manifold integrity + envelope dimensions
     raw_shell = be.build_enclosure_shell(installed_inserts=False)

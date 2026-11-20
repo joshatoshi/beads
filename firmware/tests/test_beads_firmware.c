@@ -33,6 +33,7 @@ static uint32_t g_uart_hw_tail = 0u;
 static uint8_t  g_flash_slots[2][4096];
 static uint32_t g_flash_writes = 0u;
 static uint32_t g_i2c_writes = 0u;
+static void   (*g_i2c_hook)(void) = NULL;
 static bool     g_usb_boot_called = false;
 static bool     g_spi_pwr_safe_enabled = false;
 static int      g_crit_depth = 0;
@@ -89,6 +90,9 @@ bool hal_i2c0_write_timeout(uint8_t addr7, const uint8_t *buf, size_t len, uint3
     assert(addr7 == OLED_I2C_ADDR);
     assert(buf != NULL && len > 0u && timeout_us > 0u);
     g_i2c_writes++;
+    if (g_i2c_hook != NULL) {
+        g_i2c_hook();
+    }
     return true;
 }
 
@@ -172,6 +176,7 @@ static void test_bypass_por_photomos_and_flexi(void) {
 
     /* Exact 15.0 ms (30-tick) Runtime Popless Bypass Transition (Active -> Bypass) */
     bypass_seq_set_target(&seq, false);
+    assert(!bypass_seq_is_idle(&seq)); /* Pending target != current MUST immediately report non-idle! */
     /* Tick 1..7 (3.5 ms): BYP_STATE_MUTING, relay still ON, PhotoMOS ON */
     for (int t = 1; t <= 7; t++) {
         bypass_seq_tick_2khz(&seq, true, false);
@@ -463,10 +468,15 @@ static void test_flash_ab_crc32_and_oled_uf2(void) {
     printf("[PASS] Test 6: Dual-slot A/B CRC32+write_seq Flash, 16-state EC11E +-2 detent LUT, OLED & 1200-baud UF2 boot\n");
 }
 
-/* Forward declarations of integrated dual-core entry hooks in main.c */
+/* Forward declarations of integrated dual-core entry hooks & host test accessors in main.c */
 extern void beads_app_init(void);
 extern void beads_core0_tick_handler(void);
 extern void beads_core1_service_slice(uint32_t now_ms);
+extern cv_engine_t   *beads_test_get_engine(void);
+extern bypass_seq_t  *beads_test_get_bypass(void);
+extern midi_router_t *beads_test_get_midi(void);
+extern preset_mgr_t  *beads_test_get_presets(void);
+extern oled_ui_t     *beads_test_get_ui(void);
 
 /* ============================================================================
  * TEST 7: Full Integrated Core 0 (2kHz) + Core 1 Loop (FS2 Freeze/Tap, ADC0
@@ -766,6 +776,219 @@ static void test_oled_ui_complete_and_midi_div6(void) {
     printf("[PASS] Test 9: Complete OLED UI, MIDI /6 wrap & MIDI PC channel/active_preset sync\n");
 }
 
+/* ============================================================================
+ * TEST 10: Dynamic PIN_VBUS_DET USB PULLUP_EN Gating & Hot-Unplug Latch Probe
+ * ============================================================================ */
+typedef struct {
+    bool     host_vbus_present;
+    bool     self_latch_enabled; /* Models SRV05-4 IO2/IO3->VP backfeed keeping VBUS_DET high while pullup=1 */
+    bool     suspended;
+    bool     pullup_en;
+    uint32_t now_us;
+    uint32_t last_delay_us;
+    uint32_t attach_cnt;
+    uint32_t detach_cnt;
+    uint32_t pullup_drop_cnt;
+} mock_vbus_hw_t;
+
+static bool mv_read_vbus(void *ctx) {
+    mock_vbus_hw_t *m = (mock_vbus_hw_t *)ctx;
+    if (m->host_vbus_present) return true;
+    /* When cable is unplugged into open air and PULLUP_EN=1, SRV05-4 back-feeds ~1.53V onto VBUS_DET!
+     * Clearing PULLUP_EN=0 discharges R25+R26 -> VBUS_DET drops to 0V! */
+    return m->self_latch_enabled && m->pullup_en;
+}
+static bool     mv_is_susp(void *ctx)  { return ((mock_vbus_hw_t *)ctx)->suspended; }
+static uint32_t mv_time_us(void *ctx)  { return ((mock_vbus_hw_t *)ctx)->now_us; }
+static void     mv_delay_us(void *ctx, uint32_t us) {
+    mock_vbus_hw_t *m = (mock_vbus_hw_t *)ctx;
+    m->last_delay_us = us;
+    m->now_us += us;
+}
+static void mv_set_pullup(void *ctx, bool en) {
+    mock_vbus_hw_t *m = (mock_vbus_hw_t *)ctx;
+    if (m->pullup_en && !en) m->pullup_drop_cnt++;
+    m->pullup_en = en;
+}
+static void mv_on_attach(void *ctx) {
+    mock_vbus_hw_t *m = (mock_vbus_hw_t *)ctx;
+    m->attach_cnt++;
+    m->pullup_en = true;
+}
+static void mv_on_detach(void *ctx) {
+    mock_vbus_hw_t *m = (mock_vbus_hw_t *)ctx;
+    m->detach_cnt++;
+    m->pullup_en = false;
+}
+
+static void test_usb_vbus_gating_and_latch_probe(void) {
+    mock_vbus_hw_t m;
+    memset(&m, 0, sizeof(m));
+    m.self_latch_enabled = true;
+    m.now_us = 10000u;
+
+    usb_vbus_hw_t hw = {
+        .read_vbus_det = mv_read_vbus,
+        .is_suspended  = mv_is_susp,
+        .time_us_32    = mv_time_us,
+        .delay_us      = mv_delay_us,
+        .set_pullup    = mv_set_pullup,
+        .on_attach     = mv_on_attach,
+        .on_detach     = mv_on_detach,
+        .ctx           = &m,
+    };
+    usb_vbus_state_t vs;
+    usb_vbus_init(&vs);
+
+    /* 1. Cold boot with no USB host / powered-off host (0V): PULLUP_EN MUST remain 0! */
+    assert(!usb_vbus_sync(&vs, &hw));
+    assert(!vs.attached && !m.pullup_en && m.attach_cnt == 0u);
+
+    /* 2. Hot-plug live +5V USB host -> attaches and asserts PULLUP_EN */
+    m.host_vbus_present = true;
+    m.now_us += 5000u;
+    assert(usb_vbus_sync(&vs, &hw));
+    assert(vs.attached && m.pullup_en && m.attach_cnt == 1u);
+
+    /* 3. Active USB traffic (SUSPENDED=0) for 1 second -> PULLUP_EN NEVER drops! */
+    m.suspended = false;
+    for (int i = 0; i < 20; i++) {
+        m.now_us += 50000u;
+        assert(usb_vbus_sync(&vs, &hw));
+    }
+    assert(vs.attached && m.pullup_en && m.pullup_drop_cnt == 0u && m.detach_cnt == 0u);
+
+    /* 4. Real host enters USB Suspend while keeping +5V VBUS live -> probe after 250ms keeps link attached */
+    m.suspended = true;
+    m.now_us += BEADS_USB_UNPLUG_PROBE_PERIOD_US - 1000u;
+    assert(usb_vbus_sync(&vs, &hw));
+    assert(m.pullup_drop_cnt == 0u); /* Not yet due */
+    m.now_us += 2000u;
+    assert(usb_vbus_sync(&vs, &hw));
+    assert(m.pullup_drop_cnt == 1u && m.last_delay_us >= 50u);
+    assert(vs.attached && m.pullup_en && m.detach_cnt == 0u);
+
+    /* 5. Hot-unplug into open air while SRV05-4 self-latches VBUS_DET=HIGH -> SUSPENDED probe breaks latch! */
+    m.host_vbus_present = false;
+    m.suspended = true;
+    assert(mv_read_vbus(&m)); /* Confirm self-latch is actively fooling naive GPIO read! */
+    m.now_us += BEADS_USB_UNPLUG_PROBE_PERIOD_US + 1000u;
+    assert(!usb_vbus_sync(&vs, &hw));
+    assert(!vs.attached && !m.pullup_en && m.detach_cnt == 1u && m.last_delay_us >= 50u);
+    assert(!mv_read_vbus(&m)); /* Latch permanently broken: 0V VBUS_DET, <1 uA backfeed! */
+
+    /* 6. Re-attach then immediate host power-off (low-Z 0V VBUS, no self-latch) -> immediate detach! */
+    m.host_vbus_present = true;
+    m.suspended = false;
+    m.now_us += 5000u;
+    assert(usb_vbus_sync(&vs, &hw));
+    assert(vs.attached && m.pullup_en && m.attach_cnt == 2u);
+    m.host_vbus_present = false;
+    m.self_latch_enabled = false;
+    m.now_us += 1000u;
+    assert(!usb_vbus_sync(&vs, &hw));
+    assert(!vs.attached && !m.pullup_en && m.detach_cnt == 2u);
+
+    printf("[PASS] Test 10: Dynamic PIN_VBUS_DET PULLUP_EN gating, SUSPENDED >=50us hot-unplug latch break & clean detach\n");
+}
+
+/* ============================================================================
+ * TEST 11: Core 1 TOCTOU Flash Lockout Regression (Post-UI Preset Recall,
+ * Mid-I2C MIDI Burst Injection, Un-drained Ring Guard & Signed Delta Underflow)
+ * ============================================================================ */
+static bool g_inject_midi_during_i2c = false;
+static void i2c_mid_flush_midi_injector(void) {
+    if (!g_inject_midi_during_i2c) return;
+    g_inject_midi_during_i2c = false;
+    /* Simulate Core 0 receiving a UART MIDI Note-On during the ~3.1 ms SSD1306 I2C page flush! */
+    midi_router_t *mr = beads_test_get_midi();
+    midi_router_uart_push_dr(mr, 0x90u);
+    midi_router_uart_push_dr(mr, 60u);
+    midi_router_uart_push_dr(mr, 100u);
+    g_now_us += CORE0_TICK_US;
+    beads_core0_tick_handler();
+}
+
+static void test_core1_toctou_flash_lockout_guards(void) {
+    /* 1. Signed silence delta guard: now_ms < last_non_rt_midi_ms MUST NOT wrap around unsigned! */
+    hal_init();
+    memset(g_flash_slots, 0xFF, sizeof(g_flash_slots));
+    g_flash_writes = 0u;
+    preset_mgr_t pm_chk;
+    preset_mgr_init(&pm_chk);
+    preset_mgr_mark_dirty(&pm_chk);
+    assert(!preset_mgr_save_if_safe(&pm_chk, true, 1000u, 1002u)); /* -2 ms < 300 ms -> MUST refuse! */
+    assert(g_flash_writes == 0u && pm_chk.dirty);
+
+    /* 2. Integrated Core 0 + Core 1 TOCTOU #1: OLED Preset Recall flipping startup_active */
+    memset(g_flash_slots, 0xFF, sizeof(g_flash_slots));
+    g_flash_writes = 0u;
+    g_now_us = 1000u;
+    beads_app_init();
+
+    cv_engine_t   *eng = beads_test_get_engine();
+    bypass_seq_t  *byp = beads_test_get_bypass();
+    midi_router_t *mr  = beads_test_get_midi();
+    preset_mgr_t  *pm  = beads_test_get_presets();
+    oled_ui_t     *ui  = beads_test_get_ui();
+    oled_ui_init(ui);
+
+    /* Preset 2 switches pedal from Active (1) -> Bypass (0) */
+    pm->live.presets[2].startup_active = 0u;
+
+    /* Run 1200 Core 0 ticks (600 ms): clears 250 ms POR + satisfies >= 300 ms MIDI silence */
+    for (int t = 0; t < 1200; t++) {
+        g_now_us += CORE0_TICK_US;
+        beads_core0_tick_handler();
+    }
+    assert(bypass_seq_is_idle(byp) && byp->current_active == true);
+
+    /* Arm OLED Preset Recall click on Preset 2 (sets target_active=false & pm->dirty=true INSIDE service slice!) */
+    ui->page = UI_PAGE_PRESET;
+    ui->cursor = 2u;
+    eng->enc_sw_click_ev = true;
+
+    beads_core1_service_slice(eng->tick_count >> 1u);
+    assert(byp->target_active == false && byp->current_active == true);
+    assert(!bypass_seq_is_idle(byp));
+    assert(g_flash_writes == 0u && pm->dirty); /* MUST NOT commit Flash mid-pending-bypass! */
+
+    /* Complete the 15 ms clickless relay transition (40 ticks = 20 ms) */
+    for (int t = 0; t < 40; t++) {
+        g_now_us += CORE0_TICK_US;
+        beads_core0_tick_handler();
+    }
+    assert(bypass_seq_is_idle(byp) && byp->current_active == false);
+
+    /* 3. Integrated Core 0 + Core 1 TOCTOU #2: MIDI burst arriving DURING ~3.1 ms OLED I2C flush! */
+    g_i2c_hook = i2c_mid_flush_midi_injector;
+    g_inject_midi_during_i2c = true;
+    beads_core1_service_slice(eng->tick_count >> 1u);
+    g_i2c_hook = NULL;
+    assert(mr->gate_high);                    /* MIDI Note-On really arrived mid-I2C! */
+    assert(g_flash_writes == 0u && pm->dirty); /* Atomic post-I2C check MUST block Flash lockout! */
+
+    /* 4. Advance 620 ticks (310 ms silence), then verify an un-drained USB-MIDI ring also blocks Flash */
+    for (int t = 0; t < 620; t++) {
+        g_now_us += CORE0_TICK_US;
+        beads_core0_tick_handler();
+    }
+    uint8_t pending_note[4] = { 0x09u, 0x90u, 64u, 90u };
+    assert(midi_router_usb_push_packet(mr, pending_note));
+    beads_core1_service_slice(eng->tick_count >> 1u);
+    assert(g_flash_writes == 0u && pm->dirty); /* Un-drained USB ring MUST defer Flash! */
+
+    /* Drain pending USB-MIDI packet and wait 310 ms of true silence -> Flash commit now succeeds! */
+    for (int t = 0; t < 625; t++) {
+        g_now_us += CORE0_TICK_US;
+        beads_core0_tick_handler();
+    }
+    beads_core1_service_slice(eng->tick_count >> 1u);
+    assert(g_flash_writes == 1u && !pm->dirty);
+
+    printf("[PASS] Test 11: Core 1 TOCTOU Flash lockout guards (target!=current, mid-I2C MIDI, pending ring, signed delta)\n");
+}
+
 int main(void) {
     test_bypass_por_photomos_and_flexi();
     test_bezier_c1_continuity();
@@ -776,6 +999,8 @@ int main(void) {
     test_integrated_dual_core_engine();
     test_usb_descriptors_and_multipacket_ep0();
     test_oled_ui_complete_and_midi_div6();
-    printf("ALL 9 FIRMWARE SILICON-MOCK UNIT TEST SUITES PASSED (100%% ASSERTIONS)!\n");
+    test_usb_vbus_gating_and_latch_probe();
+    test_core1_toctou_flash_lockout_guards();
+    printf("ALL 11 FIRMWARE SILICON-MOCK UNIT TEST SUITES PASSED (100%% ASSERTIONS)!\n");
     return 0;
 }

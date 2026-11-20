@@ -9,6 +9,8 @@ __pycache__/
 .lane/
 .pio/
 build/
-firmware/build/
+!firmware/build/
+firmware/build/*
+!firmware/build/beads_bridge.uf2
 venv/
 .venv/

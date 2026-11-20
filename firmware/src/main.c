@@ -35,8 +35,6 @@ void beads_core1_service_slice(uint32_t now_ms) {
     int32_t enc_d = 0;
     bool enc_c = false;
     bool back_c = false;
-    bool byp_idle = false;
-    uint32_t last_non_rt = 0u;
 
     hal_crit_enter();
     enc_d = g_engine.enc_delta_accum;
@@ -45,8 +43,6 @@ void beads_core1_service_slice(uint32_t now_ms) {
     g_engine.enc_sw_click_ev = false;
     back_c = g_engine.back_click_ev;
     g_engine.back_click_ev = false;
-    byp_idle = bypass_seq_is_idle(&g_bypass);
-    last_non_rt = g_midi.last_non_rt_ms;
     hal_crit_exit();
 
     oled_ui_handle_inputs(&g_ui, enc_d, enc_c, back_c, &g_engine, &g_bypass, &g_midi, &g_presets);
@@ -58,8 +54,28 @@ void beads_core1_service_slice(uint32_t now_ms) {
     hal_crit_exit();
     (void)oled_ui_flush_one_page(&g_ui);
 
-    /* 4. Idle-deferred dual-slot A/B CRC32 QSPI Flash save (only when BYP_STATE_IDLE & >=300ms silence!) */
-    (void)preset_mgr_save_if_safe(&g_presets, byp_idle, now_ms, last_non_rt);
+    /* 4. Idle-deferred dual-slot A/B CRC32 QSPI Flash save:
+     * Re-sample live bypass_seq_is_idle(&g_bypass), pending MIDI bypass/preset & ring flags,
+     * fresh monotonic now_ms = (g_engine.tick_count >> 1u), and fresh g_midi.last_non_rt_ms
+     * atomically inside hal_crit_enter() right before staging the frozen snapshot (zero TOCTOU!). */
+    (void)now_ms;
+    uint32_t flash_slot = 0u;
+    bool should_commit_flash = false;
+    hal_crit_enter();
+    uint32_t fresh_now_ms = g_engine.tick_count >> 1u;
+    bool midi_idle = !g_midi.bypass_req_valid &&
+                     !g_midi.preset_req_valid &&
+                     (g_midi.uart_ring.head == g_midi.uart_ring.tail) &&
+                     (g_midi.usb_ring.head == g_midi.usb_ring.tail);
+    bool byp_idle_now = bypass_seq_is_idle(&g_bypass) && midi_idle;
+    uint32_t fresh_last_non_rt = g_midi.last_non_rt_ms;
+    should_commit_flash = preset_mgr_try_stage_locked(
+        &g_presets, byp_idle_now, fresh_now_ms, fresh_last_non_rt, &flash_slot
+    );
+    hal_crit_exit();
+    if (should_commit_flash) {
+        (void)preset_mgr_commit_staged(&g_presets, flash_slot);
+    }
 }
 
 void beads_app_init(void) {
@@ -73,6 +89,14 @@ void beads_app_init(void) {
     midi_router_init(&g_midi, boot_preset->midi_channel);
     cv_engine_init(&g_engine, boot_preset, boot_idx, &g_presets.live.cal);
 }
+
+#ifdef BEADS_HOST_UNIT_TEST
+cv_engine_t   *beads_test_get_engine(void)  { return &g_engine; }
+bypass_seq_t  *beads_test_get_bypass(void)  { return &g_bypass; }
+midi_router_t *beads_test_get_midi(void)    { return &g_midi; }
+preset_mgr_t  *beads_test_get_presets(void) { return &g_presets; }
+oled_ui_t     *beads_test_get_ui(void)      { return &g_ui; }
+#endif
 
 #ifndef BEADS_HOST_UNIT_TEST
 /* Target RP2040 entrypoint (also supports Pico SDK multicore_launch_core1 when built with PICO_SDK) */

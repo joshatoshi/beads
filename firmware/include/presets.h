@@ -94,6 +94,9 @@ typedef struct {
 uint32_t beads_crc32(const void *data, size_t len);
 void     preset_mgr_load_factory_defaults(beads_nvm_block_t *blk);
 void     preset_mgr_init(preset_mgr_t *pm);
+bool     preset_mgr_try_stage_locked(preset_mgr_t *pm, bool bypass_idle, uint32_t now_ms,
+                                     uint32_t last_non_rt_midi_ms, uint32_t *out_slot);
+bool     preset_mgr_commit_staged(preset_mgr_t *pm, uint32_t slot);
 bool     preset_mgr_save_if_safe(preset_mgr_t *pm, bool bypass_idle, uint32_t now_ms, uint32_t last_non_rt_midi_ms);
 void     preset_mgr_mark_dirty(preset_mgr_t *pm);
 const beads_preset_t *preset_mgr_get(const preset_mgr_t *pm, uint8_t idx);

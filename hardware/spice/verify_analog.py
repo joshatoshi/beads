@@ -134,13 +134,20 @@ quit
 
 def test_2_usb_isolation(vals: dict[str, str], pin_nets: dict[tuple[str, str], str]) -> None:
     # Verify netlist topology: D_OR_PED (1N5819WS) replaces Q_PED_OR/Q_PED_DRV/R28,
-    # U_LVL (SN74AHCT541PWR) translates 3.3V->5V SPI/CS, and R77..R80 pull up to +5V_BUCK (NOT +3V3_DIG!)
+    # U_LVL (SN74AHCT541PWR) translates 3.3V->5V SPI/CS, R77..R80 pull up to +5V_BUCK (NOT +3V3_DIG!),
+    # and U_USB_ESD (SRV05-4) + R23 (27R) + R25/R26 (VBUS_DET) match the schematic netlist.
     assert vals.get("D_OR_PED") == "1N5819WS", f"Expected D_OR_PED=1N5819WS, got {vals.get('D_OR_PED')}"
     for forbidden in ("Q_PED_OR", "Q_PED_DRV", "R28"):
         assert forbidden not in vals, f"Forbidden back-power latch-up part {forbidden} still in netlist!"
     assert vals.get("U_LVL") == "SN74AHCT541PWR", f"Expected U_LVL=SN74AHCT541PWR, got {vals.get('U_LVL')}"
+    assert vals.get("U_USB_ESD") == "SRV05-4-P-T7", f"Expected U_USB_ESD=SRV05-4-P-T7, got {vals.get('U_USB_ESD')}"
     assert pin_nets[("D_OR_PED", "2")] == "+5V_BUCK" and pin_nets[("D_OR_PED", "1")] == "VIN_3V3_LDO"
     assert pin_nets[("U_LVL", "20")] == "+5V_BUCK" and pin_nets[("U_LVL", "10")] == "GND"
+    assert pin_nets[("U_USB_ESD", "5")] == "USB_VBUS" and pin_nets[("U_USB_ESD", "2")] == "GND"
+    assert pin_nets[("U_USB_ESD", "3")] == "USB_DP_CON" and pin_nets[("U_USB_ESD", "4")] == "USB_DP_CON"
+    assert pin_nets[("R23", "1")] == "USB_DP_CON" and pin_nets[("R23", "2")] == "USB_DP"
+    assert pin_nets[("R25", "1")] == "USB_VBUS" and pin_nets[("R25", "2")] == "VBUS_DET"
+    assert pin_nets[("R26", "1")] == "VBUS_DET" and pin_nets[("R26", "2")] == "GND"
     for rref, cs_net in [("R77", "DAC0_CS_N"), ("R78", "DAC1_CS_N"), ("R79", "DAC2_CS_N"), ("R80", "DAC3_CS_N")]:
         assert pin_nets[(rref, "1")] == "+5V_BUCK", f"{rref}.1 must tie to +5V_BUCK, got {pin_nets[(rref, '1')]}"
         assert pin_nets[(rref, "2")] == cs_net, f"{rref}.2 must tie to {cs_net}, got {pin_nets[(rref, '2')]}"
@@ -151,32 +158,71 @@ def test_2_usb_isolation(vals: dict[str, str], pin_nets: dict[tuple[str, str], s
 
     r27 = parse_value_ohms(vals["R27"])
     r3 = parse_value_ohms(vals["R3"])
+    r23 = parse_value_ohms(vals["R23"])
+    r24 = parse_value_ohms(vals["R24"])
+    r25 = parse_value_ohms(vals["R25"])
+    r26 = parse_value_ohms(vals["R26"])
     r_cs_pu = parse_value_ohms(vals["R77"])
 
-    def sim_mode(tag: str, v_buck_src: float | None, v_usb_src: float | None) -> dict[str, float]:
+    def sim_mode(
+        tag: str,
+        v_buck_src: float | None,
+        v_usb_src: float | None,
+        usb_open: bool = False,
+        pullup_gated: bool = True,
+    ) -> dict[str, float]:
         buck_elem = (
             f"V_BUCK v5_buck 0 DC {v_buck_src}"
             if v_buck_src is not None
             else f"V_BUCK_SENSE v5_buck v5_bleed DC 0\nR_BLEED v5_bleed 0 {r3}"
         )
-        usb_elem = (
-            f"V_USB usb_vbus 0 DC {v_usb_src}"
-            if v_usb_src is not None
-            else "V_USB usb_vbus 0 DC 0"
-        )
+        if usb_open:
+            usb_elem = "V_USB usb_vbus_raw usb_open_n DC 0\nR_USB_OPEN usb_open_n 0 1G"
+        elif v_usb_src is not None:
+            usb_elem = f"V_USB usb_vbus_raw 0 DC {v_usb_src}"
+        else:
+            usb_elem = "V_USB usb_vbus_raw 0 DC 0"
         i_buck_expr = "-i(V_BUCK)" if v_buck_src is not None else "i(V_BUCK_SENSE)"
-        # Model +3V3_DIG (from AMS1117-3.3), R77..R80 pulled to +5V_BUCK, MCP4822 upper ESD clamp diodes
-        # to +5V_BUCK, and worst-case 3.3V inputs on SN74AHCT541 (no input->VCC clamp diode; <=0.1uA to GND).
-        deck = f"""* Beads Test 2: Bidirectional <1uA USB-C VBUS <-> +5V_BUCK Isolation + +3V3_DIG/ESD Latch Audit ({tag})
+        # RP2040 internal 1.5 kOhm D+ pull-up: when gated by PIN_VBUS_DET, SW_DP_PU conducts ONLY when VBUS_DET > 1.8V;
+        # when ungated (bug regression check), SW_DP_PU is forced ON whenever +3V3_DIG is up.
+        if pullup_gated:
+            pu_elem = (
+                ".model SW_VBUS_PU SW(RON=1.5k ROFF=1G VT=1.80 VH=0.10)\n"
+                "S_DP_PU v3v3_dig usb_dp vbus_det 0 SW_VBUS_PU"
+            )
+        else:
+            pu_elem = "R_DP_PU_UNGATED v3v3_dig usb_dp 1.5k"
+        # Model +3V3_DIG (from AMS1117-3.3), F_USB, U_USB_ESD (SRV05-4 steering diodes IO2/IO3->VP),
+        # R23/R24 (27R), R25/R26 (10k/15k VBUS_DET divider), R77..R80 pulled to +5V_BUCK, MCP4822 upper ESD
+        # clamp diodes to +5V_BUCK, and worst-case 3.3V inputs on SN74AHCT541.
+        deck = f"""* Beads Test 2: Bidirectional <1uA USB-C VBUS <-> +5V_BUCK Isolation + SRV05-4 & VBUS_DET Pull-Up Audit ({tag})
 .model PMOS_AO3401 PMOS(VTO=-1.1 KP=12 LAMBDA=0.02 RD=0.02 RS=0.02 IS=1e-13)
 .model D_BODY D(IS=1e-12 N=1.05 RS=0.05)
 * Hottech 1N5819WS (C191023) 25C datasheet fit: Vf=0.34V@50mA, Vf=0.54V@1A, Ir=200nA@5V
 .model D_1N5819 D(IS=2.0e-7 N=1.05 RS=0.12 BV=40 IBV=500u)
 .model D_ESD D(IS=1e-13 N=1.05 RS=2.0)
+* Semtech/LCSC SRV05-4-P-T7 (C85364) steering diodes (IO -> VP, VN -> IO) + 6V TVS (VP -> VN)
+.model D_SRV05 D(IS=2e-13 N=1.05 RS=0.8)
+.model D_SRV05_TVS D(IS=1e-13 N=1.05 RS=0.5 BV=6.5 IBV=1m)
 {buck_elem}
 {usb_elem}
-* USB path: D_USB_FWD (1N5819WS) + Q_USB (AO3401A: D=usb_post, S=vin_3v3, G=R27->+5V_BUCK)
-D_USB_FWD usb_vbus usb_post D_1N5819
+R_FUSB usb_vbus_raw usb_vbus 0.35
+* VBUS_DET divider (R25=10k, R26=15k -> GPIO24)
+R25 usb_vbus vbus_det {r25}
+R26 vbus_det 0 {r26}
+* U_USB_ESD (SRV05-4-P-T7): Pin 5 VP=USB_VBUS, Pin 2 VN=GND, IO2/IO3=USB_DP_CON, IO1/IO4=USB_DM_CON
+D_SRV_DP_HI usb_dp_con usb_vbus D_SRV05
+D_SRV_DP_LO 0 usb_dp_con D_SRV05
+D_SRV_DM_HI usb_dm_con usb_vbus D_SRV05
+D_SRV_DM_LO 0 usb_dm_con D_SRV05
+D_SRV_TVS 0 usb_vbus D_SRV05_TVS
+R23 usb_dp_con usb_dp {r23}
+R24 usb_dm_con usb_dm {r24}
+R_DM_LEAK usb_dm 0 100Meg
+{pu_elem}
+* USB power path: D_USB_FWD (1N5819WS) + Q_USB (AO3401A: D=usb_post, S=vin_3v3, G=R27->+5V_BUCK)
+V_USB_PWR_SENSE usb_vbus usb_fwd_a DC 0
+D_USB_FWD usb_fwd_a usb_post D_1N5819
 M_QUSB usb_post q_usb_g vin_3v3 vin_3v3 PMOS_AO3401 W=1 L=1
 D_QUSB_BD usb_post vin_3v3 D_BODY
 R27 v5_buck q_usb_g {r27}
@@ -202,34 +248,79 @@ R_LVL_Y0 dac0_cs 0 100Meg
 R_LVL_Y1 dac1_cs 0 100Meg
 R_LVL_Y2 dac2_cs 0 100Meg
 R_LVL_Y3 dac3_cs 0 100Meg
-* Transient ramp check in USB-only mode ensures zero dynamic back-power latch-up
 .op
 .control
 op
 let v_ldo = v(vin_3v3)
 let v_3v3 = v(v3v3_dig)
 let i_usb = -i(V_USB)
+let i_usb_pwr = i(V_USB_PWR_SENSE)
 let i_buck = {i_buck_expr}
 let v_buck = v(v5_buck)
-print v_ldo v_3v3 i_usb i_buck v_buck
+let v_vbus = v(usb_vbus)
+let v_vbus_det = v(vbus_det)
+let v_dp_con = v(usb_dp_con)
+print v_ldo v_3v3 i_usb i_usb_pwr i_buck v_buck v_vbus v_vbus_det v_dp_con
 quit
 .endc
 .end
 """
         return run_ngspice(f"t2_{tag}", deck)
 
-    m_ped = sim_mode("pedal_only", 5.08, None)      # Pedal ON, USB host powered off (0V)
-    m_both = sim_mode("both_on", 5.08, 5.00)        # Both Pedal 5.08V and USB 5.00V ON
-    m_usb = sim_mode("usb_only", None, 5.00)        # Pedal OFF (bleed to 0V), USB 5.00V ON, +3V3_DIG active
+    m_ped = sim_mode("pedal_only", 5.08, None)                       # Pedal ON, USB host powered off (0V)
+    m_ped_open = sim_mode("pedal_unplugged", 5.08, None, usb_open=True)  # Pedal ON, USB cable unplugged
+    m_ungated_0v = sim_mode("ungated_0v_proof", 5.08, None, pullup_gated=False)
+    m_ungated_open = sim_mode("ungated_open_proof", 5.08, None, usb_open=True, pullup_gated=False)
+    m_both = sim_mode("both_on", 5.08, 5.00)                         # Both Pedal 5.08V and USB 5.00V ON
+    m_usb = sim_mode("usb_only", None, 5.00)                         # Pedal OFF (bleed to 0V), USB 5.00V ON
 
+    # Confirm the ungated negative-control reproduces the exact ~1.7 mA backfeed & ~1.5 V latch fault!
+    assert abs(m_ungated_0v["i_usb"]) > 1.5e-3, f"Expected ungated D+ pull-up backfeed >1.5mA, got {m_ungated_0v}"
+    assert m_ungated_open["v_vbus_det"] > 1.40, f"Expected ungated open-cable VBUS_DET latch >1.4V, got {m_ungated_open}"
+
+    # Verify VBUS_DET-gated firmware eliminates backfeed (< 1 uA) & floating VBUS (< 50 mV)!
     assert abs(m_ped["i_usb"]) < 1e-6, f"Pedal->USB backfeed >= 1uA: {m_ped}"
     assert m_ped["v_ldo"] >= 4.60, f"Pedal-only VIN_3V3_LDO too low for AMS1117: {m_ped}"
-    assert abs(m_both["i_usb"]) < 1e-6, f"Dual-powered USB current >= 1uA: {m_both}"
+    assert m_ped_open["v_vbus"] < 0.05 and m_ped_open["v_vbus_det"] < 0.05, f"Unplugged USB_VBUS floated: {m_ped_open}"
+    # In dual-powered mode, V_USB supplies R25+R26 sense divider (~200 uA forward), while USB->LDO power path is < 1 uA
+    # and D+ pull-up is cleanly enabled (>= 3.1 V) for USB enumeration with zero reverse backfeed!
+    assert abs(m_both["i_usb_pwr"]) < 1e-6, f"Dual-powered USB->LDO current >= 1uA: {m_both}"
+    assert m_both["i_usb"] > 0.0, f"Dual-powered reverse current into USB host: {m_both}"
+    assert m_both["v_dp_con"] >= 3.10, f"Dual-powered D+ pull-up failed to assert: {m_both}"
     assert m_both["v_ldo"] >= 4.60, f"Dual-powered VIN_3V3_LDO too low: {m_both}"
     assert abs(m_usb["i_buck"]) < 1e-6, f"USB->+5V_BUCK backfeed >= 1uA: {m_usb}"
     assert m_usb["v_buck"] < 0.05, f"USB-only back-power latch-up on +5V_BUCK: {m_usb}"
     assert m_usb["v_ldo"] >= 4.50, f"USB-only VIN_3V3_LDO too low for AMS1117: {m_usb}"
     assert m_usb["v_3v3"] >= 3.25, f"USB-only +3V3_DIG failed to come up: {m_usb}"
+
+    # Dynamic transient verification of hot-unplug SUSPENDED PULLUP_EN=0 probe (>=50 us breaks SRV05-4 self-latch!)
+    probe_deck = f"""* Beads Test 2C: Hot-Unplug SRV05-4 Latch-Break Probe (100 us PULLUP_EN=0)
+.model D_SRV05 D(IS=2e-13 N=1.05 RS=0.8 CJO=50p)
+.model SW_PU SW(RON=1.5k ROFF=1G VT=1.5 VH=0.1)
+V_3V3 v3v3_dig 0 DC 3.30
+* PULLUP_EN starts HIGH (self-latching unplugged USB_VBUS), drops LOW at t=20us for 100us probe
+V_PU_EN pu_ctl 0 PWL(0 3.3 20u 3.3 21u 0 121u 0)
+S_PU v3v3_dig usb_dp pu_ctl 0 SW_PU
+R23 usb_dp usb_dp_con {r23}
+D_SRV_DP_HI usb_dp_con usb_vbus D_SRV05
+* Worst-case 300pF parasitic bus/TVS/diode capacitance on unplugged USB_VBUS
+C_PAR usb_vbus 0 300p
+R25 usb_vbus vbus_det {r25}
+R26 vbus_det 0 {r26}
+.tran 0.5u 120u
+.control
+run
+meas tran vdet_latched FIND v(vbus_det) AT=18u
+meas tran vdet_50us    FIND v(vbus_det) AT=71u
+meas tran vdet_100us   FIND v(vbus_det) AT=119u
+quit
+.endc
+.end
+"""
+    m_probe = run_ngspice("t2_unplug_probe", probe_deck)
+    assert m_probe["vdet_latched"] > 1.40, f"Expected initial self-latched VBUS_DET > 1.4V: {m_probe}"
+    assert m_probe["vdet_50us"] < 0.20, f"50us probe failed to discharge VBUS_DET below 0.20V: {m_probe}"
+    assert m_probe["vdet_100us"] < 0.05, f"100us probe failed to discharge VBUS_DET below 0.05V: {m_probe}"
 
     # Dynamic transient verification of USB-only hot-plug ramp (0V -> 5.0V over 1ms) with +3V3_DIG + ESD + R77..80
     tran_deck = f"""* Beads Test 2B: USB-only Hot-Plug Transient Latch-Up Audit
@@ -271,10 +362,12 @@ quit
     assert m_tran["v_buck_pk"] < 0.10 and m_tran["v_buck_ss"] < 0.05, f"USB-only transient latch-up on +5V_BUCK: {m_tran}"
     assert m_tran["v_3v3_ss"] >= 3.25, f"USB-only transient +3V3_DIG failed: {m_tran}"
     print(
-        f"[PASS] Test 2 (Bidirectional USB Isolation + 3.3V/ESD Transient Zero Latch-Up): "
-        f"Pedal->USB={abs(m_ped['i_usb'])*1e9:.2f}nA (Vldo={m_ped['v_ldo']:.3f}V) | "
-        f"Both->Iusb={abs(m_both['i_usb'])*1e9:.2f}nA | "
-        f"USB->5V_BUCK={abs(m_usb['i_buck'])*1e9:.1f}nA (Vbuck_pk={m_tran['v_buck_pk']*1e3:.2f}mV, Vbuck_ss={m_tran['v_buck_ss']*1e3:.2f}mV)"
+        f"[PASS] Test 2 (Bidirectional USB Isolation + SRV05-4 VBUS_DET Pull-Up Gating & Probe): "
+        f"Pedal->0VHost={abs(m_ped['i_usb'])*1e9:.2f}nA (vs ungated {abs(m_ungated_0v['i_usb'])*1e3:.2f}mA) | "
+        f"Unplugged VBUS={m_ped_open['v_vbus']*1e3:.2f}mV | "
+        f"Probe(50us)={m_probe['vdet_50us']*1e3:.1f}mV (latched={m_probe['vdet_latched']:.2f}V) | "
+        f"Both->Iusb_pwr={abs(m_both['i_usb_pwr'])*1e9:.2f}nA (D+={m_both['v_dp_con']:.2f}V) | "
+        f"USB->5V_BUCK={abs(m_usb['i_buck'])*1e9:.1f}nA (Vbuck_pk={m_tran['v_buck_pk']*1e3:.2f}mV)"
     )
 
 

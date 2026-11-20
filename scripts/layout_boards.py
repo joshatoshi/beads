@@ -37,6 +37,18 @@ def add_edge_rect(board: pcbnew.BOARD, x1: float, y1: float, x2: float, y2: floa
         board.Add(seg)
 
 
+def add_edge_poly(board: pcbnew.BOARD, pts: list[tuple[float, float]], width: float = 0.15) -> None:
+    for i in range(len(pts)):
+        a, b = pts[i], pts[(i + 1) % len(pts)]
+        seg = pcbnew.PCB_SHAPE(board)
+        seg.SetShape(pcbnew.SHAPE_T_SEGMENT)
+        seg.SetLayer(pcbnew.Edge_Cuts)
+        seg.SetStart(pt(*a))
+        seg.SetEnd(pt(*b))
+        seg.SetWidth(mm(width))
+        board.Add(seg)
+
+
 def add_edge_circle(board: pcbnew.BOARD, cx: float, cy: float, dia: float, width: float = 0.15) -> None:
     c = pcbnew.PCB_SHAPE(board)
     c.SetShape(pcbnew.SHAPE_T_CIRCLE)
@@ -374,7 +386,16 @@ def build_main_board() -> None:
 
     W, H = CONTRACT["boards"]["main_board"]["dimensions_mm"]
     ox_mb, oy_mb = CONTRACT["boards"]["main_board"]["kicad_origin_world_mm"]
-    add_edge_rect(board, 0.0, 0.0, W, H)
+    nc = CONTRACT["boards"]["main_board"]["north_wall_connectors_world_mm"]
+    # 12-segment North Edge.Cuts with two 0.70 mm deep x 6.80 mm wide SJ1-3523N collar relief notches (plan/04 §4.2)
+    x_thru = nc["J_MIDI_THRU"]["x_center"] - ox_mb
+    x_in   = nc["J_MIDI_IN"]["x_center"] - ox_mb
+    add_edge_poly(board, [
+        (0.0, 0.0),
+        (x_thru - 3.40, 0.0), (x_thru - 3.40, 0.70), (x_thru + 3.40, 0.70), (x_thru + 3.40, 0.0),
+        (x_in   - 3.40, 0.0), (x_in   - 3.40, 0.70), (x_in   + 3.40, 0.70), (x_in   + 3.40, 0.0),
+        (W, 0.0), (W, H), (0.0, H),
+    ])
 
     def w2p(xw: float, yw: float) -> tuple[float, float]:
         return (xw - ox_mb, oy_mb - yw)
@@ -397,7 +418,6 @@ def build_main_board() -> None:
         add_mh_keepout(board, px, py, radius=3.15)
 
     # 2. North-Wall Connectors (EXACT mechanical datums from hardware_contract.json!)
-    nc = CONTRACT["boards"]["main_board"]["north_wall_connectors_world_mm"]
     # 4x Neutrik NMJ4HCD2 (ST-NMJ4HCD2):
     # At rot=0, T=(0,0), TN=(0,16.23) [REAR], S=(12.7,0), SN=(12.7,16.23) [FRONT], front shoulder X=+16.70!
     # Rotate +90.0 deg so front shoulder (+X_local=+16.70) faces NORTH (-Y_pcb=-0.20 -> Y_w=181.80) and S is NORTH of T!
