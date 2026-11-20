@@ -1,0 +1,62 @@
+{
+  "project_id": "beads",
+  "project_name": "Mutable Instruments Beads Guitar Pedalboard Skiff, Stereo Audio/MIDI-to-CV Bridge & Autonomous Drift Workstation",
+  "master_plan": "PLAN.md",
+  "spec_files": [
+    "plan/00_MASTER_INDEX_AND_ARCHITECTURE.md",
+    "plan/01_POWER_PROTECTION_AND_USB_ISOLATION.md",
+    "plan/02_AUDIO_CHAIN_CV_DACS_AND_MIDI_SCHEMATIC.md",
+    "plan/03_PCB_STACKUP_BOM_AND_2LAYER_LAYOUT.md",
+    "plan/04_ENCLOSURE_3D_CAD_AND_MECHANICAL_SPEC.md",
+    "plan/05_FIRMWARE_DSP_UI_AND_VERIFICATION_GATES.md"
+  ],
+  "boards": {
+    "main_board": {
+      "layers": 2,
+      "schematic": "hardware/main_board/main_board.kicad_sch",
+      "pcb": "hardware/main_board/main_board.kicad_pcb",
+      "top_smt_pcba": true,
+      "min_bcu_gnd_pour_pct": 88.0
+    },
+    "ui_mezzanine": {
+      "layers": 2,
+      "dimensions_mm": [68.0, 108.0],
+      "schematic": "hardware/ui_mezzanine/ui_mezzanine.kicad_sch",
+      "pcb": "hardware/ui_mezzanine/ui_mezzanine.kicad_pcb",
+      "pure_tht_carrier": true
+    },
+    "faceplate_14hp": {
+      "layers": 2,
+      "dimensions_mm": [70.8, 128.5],
+      "schematic": "hardware/faceplate_14hp/faceplate_14hp.kicad_sch",
+      "pcb": "hardware/faceplate_14hp/faceplate_14hp.kicad_pcb",
+      "matte_black_eurorack_panel": true
+    }
+  },
+  "mcu": {
+    "part": "RP2040",
+    "lcsc": "C2040",
+    "flash_part": "W25Q128JVSIQ",
+    "flash_lcsc": "C97521",
+    "crystal_hz": 12000000,
+    "crystal_lcsc": "C9002",
+    "usb_flashing": "HEADERLESS_USBC_UF2_ROM_AND_OLED_MENU_AND_1200BAUD",
+    "firmware_uf2": "firmware/build/beads_bridge.uf2"
+  },
+  "enclosure": {
+    "printer": "Bambu_Lab_X2D",
+    "filament": "Bambu_PETG-HF",
+    "outer_dimensions_mm": [152.0, 185.6, 45.0],
+    "cad_generator": "cad/build_enclosure.py",
+    "collision_verifier": "cad/verify_3d_collisions.py",
+    "max_collision_mm3": 0.0
+  },
+  "mandatory_deliverables": [
+    "README.md",
+    "manufacturing/HAND_SOLDER_AND_BOM.md",
+    "hardware/spice/verify_analog.py",
+    "scripts/export_manufacturing.py",
+    "scripts/run_all_checks.sh"
+  ],
+  "verification_command": "bash scripts/run_all_checks.sh"
+}
