@@ -10,7 +10,7 @@ All fabrication outputs are pre-generated and verified in `manufacturing/`:
 
 | Board | Gerber ZIP | Layers / Thickness | Solder Mask / Silkscreen | Surface Finish | JLCPCB PCBA? | Files for PCBA |
 |---|---|---|---|---|---|---|
-| **`main_board`** (`142.0 × 146.6 mm`) | `manufacturing/main_board/main_board_gerbers.zip` | **2 Layers**, `1.6 mm` FR4, `1 oz` Cu | Green (or Matte Black) + White | HASL (Lead-Free) or ENIG | **YES — Top Side ONLY** (`Single-Sided SMT`) | `main_board_bom.csv` + `main_board_cpl.csv` (`77` unique LCSC parts: `54` Basic, `7` Preferred, `16` Extended; `304` SMD placements; `0` THT) |
+| **`main_board`** (`142.0 × 146.6 mm`) | `manufacturing/main_board/main_board_gerbers.zip` | **2 Layers**, `1.6 mm` FR4, `1 oz` Cu | Green (or Matte Black) + White | HASL (Lead-Free) or ENIG | **YES — Top Side ONLY** (`Single-Sided SMT`) | `main_board_bom.csv` + `main_board_cpl.csv` (`77` unique LCSC parts: `54` Basic, `7` Preferred, `16` Extended; `314` SMD placements; `0` THT) |
 | **`ui_mezzanine`** (`68.0 × 108.0 mm`) | `manufacturing/ui_mezzanine/ui_mezzanine_gerbers.zip` | **2 Layers**, `1.6 mm` FR4, `1 oz` Cu | Green + White | HASL (Lead-Free) | **NO (`$0` Bare PCB)** | User hand-solders pure THT parts (`ui_mezzanine_tht_bom.csv`) |
 | **`faceplate_14hp`** (`70.80 × 128.50 mm`) | `manufacturing/faceplate_14hp/faceplate_14hp_gerbers.zip` | **2 Layers**, `1.6 mm` FR4, `1 oz` Cu | **Matte Black** + Crisp White *(Select `"Remove Order Number"` / `"Specify Location"` on back)* | **ENIG (Gold)** | **NO (`$0` Bare Panel)** | Pure mechanical 14 HP Eurorack front panel with milled `26.0 × 15.0 mm` OLED window |
 
@@ -18,7 +18,7 @@ All fabrication outputs are pre-generated and verified in `manufacturing/`:
 
 ## 2. Complete User Hand-Soldered Through-Hole & Mechanical BOM (DigiKey / Thonk)
 
-Every off-the-shelf part below is **Active**, in production stock, and dimensionally verified in `cad/verify_3d_collisions.py` (`0.000 mm³` B-Rep interference across all `417` un-grouped solids + `15`-pose × `321`-part rigid-body insertion sweep):
+Every off-the-shelf part below is **Active**, in production stock, and dimensionally verified in `cad/verify_3d_collisions.py` (`0.000 mm³` B-Rep interference across all `427` un-grouped solids + `15`-pose × `331`-part rigid-body insertion sweep):
 
 | Board / Location | Designators | Qty | Component Description | Verified Manufacturer & MPN | Primary Supplier / SKU | Critical Notes |
 |---|---|---:|---|---|---|---|

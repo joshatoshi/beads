@@ -37,19 +37,39 @@ def main() -> int:
         "pico_sdk_hal.c must service buf_status before SETUP_REC"
     )
 
-    # 3. Verify PIN_VBUS_DET dynamic PULLUP_EN & VBUS_DETECT gating + SUSPENDED hot-unplug probe
-    #    + USB address/EP0 reset on disconnect in BOTH HALs!
+    # 3. Verify PIN_VBUS_DET dynamic PULLUP_EN & VBUS_DETECT gating, ZERO SUSPENDED PULLUP_EN=0
+    #    SE0 glitch probe (USB 2.0 T_DDIS=2.5us compliance!), hal_usb_ep0_is_busy(), and USB reset on detach!
+    usb_c = strip_c_comments((fw_dir / "src" / "usb_ep0.c").read_text(encoding="utf-8"))
+    main_c = strip_c_comments((fw_dir / "src" / "main.c").read_text(encoding="utf-8"))
+    oled_c = strip_c_comments((fw_dir / "src" / "oled_ui.c").read_text(encoding="utf-8"))
+
+    assert "BEADS_USB_UNPLUG_PROBE" not in usb_c and "is_suspended" not in usb_c, (
+        "usb_ep0.c still contains forbidden SUSPENDED PULLUP_EN=0 SE0 glitch probe!"
+    )
+    assert "rp2040_delay_us" not in main_c, (
+        "main.c core1_entry() must NOT call blocking rp2040_delay_us() (violates USB 2.0 2.0ms t_DSETADDR)!"
+    )
+    assert "hal_usb_ep0_is_busy()" in main_c and "oled_ui_flush_step(" in main_c, (
+        "main.c must defer OLED I2C during active EP0 transfers and use chunked oled_ui_flush_step()!"
+    )
+    assert "1u + OLED_WIDTH" not in oled_c and "1u + OLED_I2C_CHUNK_BYTES" in oled_c, (
+        "oled_ui.c must chunk SSD1306 page writes into <=16-byte bursts (never 129-byte full-page blocks)!"
+    )
+
     for name, src, addr_zero_tok in (
         ("rp2040_hal.c", rp, "USB_ADDR_ENDP = 0u"),
         ("pico_sdk_hal.c", sdk, "usb_hw->dev_addr_ctrl = 0u"),
     ):
         clean = strip_c_comments(src)
         assert "hal_gpio_read(PIN_VBUS_DET)" in clean, f"{name} missing hal_gpio_read(PIN_VBUS_DET)!"
-        assert "USB_SIE_STATUS_SUSPENDED_BITS" in clean, f"{name} missing SUSPENDED hot-unplug probe!"
         assert "USB_INTR_DEV_SOF_BITS" in clean, (
             f"{name} missing USB_INTR_DEV_SOF_BITS WC SUSPENDED clear on active 1kHz SOF traffic!"
         )
         assert "usb_vbus_sync(" in clean, f"{name} missing usb_vbus_sync() dynamic VBUS gating!"
+        assert "hal_usb_ep0_is_busy" in clean, f"{name} missing hal_usb_ep0_is_busy()!"
+        assert "_usb_is_suspended" not in clean and "_usb_delay_us" not in clean, (
+            f"{name} still contains forbidden SUSPENDED SE0 probe helpers!"
+        )
 
         init_m = re.search(r"void\s+hal_usb_init_on_core1\s*\(void\)\s*\{(.*?)\n\}", clean, re.S)
         assert init_m, f"{name} missing hal_usb_init_on_core1()"
@@ -84,8 +104,8 @@ def main() -> int:
     assert not missing, f"Compiled ELF missing EP_CTRL words: {missing}"
 
     print(
-        "[PASS] RP2040 USB EP1..EP3 EP_CTRL_INTERRUPT_PER_BUFFER (0xA8000180..0xA8000280), "
-        "PIN_VBUS_DET dynamic PULLUP_EN/VBUS_DETECT gating, SUSPENDED probe & 16MB Flash verified!"
+        "[PASS] RP2040 USB EP1..EP3 EP_CTRL_INTERRUPT_PER_BUFFER, glitch-free PIN_VBUS_DET gating "
+        "(0 suspend SE0 glitches), <500us chunked OLED/EP0 deferral & 16MB Flash verified!"
     )
     return 0
 

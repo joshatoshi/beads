@@ -1198,7 +1198,7 @@ def main() -> int:
     bd.export_step(lid, str(EXPORT_DIR / "beads_bottom_lid.step"))
     print(f"      Exported STLs & STEPs -> {EXPORT_DIR}")
 
-    print("[2/4] Building full 417-solid populated assembly STEP...")
+    print("[2/4] Building full populated assembly STEP...")
     solids = build_populated_solids()
     assy = bd.Compound(children=[s for s, _ in solids.values()])
     bd.export_step(assy, str(EXPORT_DIR / "beads_full_assembly.step"))

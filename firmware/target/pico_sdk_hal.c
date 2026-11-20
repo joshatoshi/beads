@@ -274,35 +274,6 @@ static bool sdk_usb_read_vbus_det(void *ctx) {
     return hal_gpio_read(PIN_VBUS_DET);
 }
 
-static bool sdk_usb_is_suspended(void *ctx) {
-    (void)ctx;
-    /* RP2040 USB_SIE_STATUS.SUSPENDED (bit 4) is WC (Write-1-to-Clear) and latches 3 ms after
-     * attach during USB 2.0 T_ATTDB pre-reset idle. Clear SUSPENDED & RESUME whenever a 1 kHz
-     * SOF (USB_INTR.DEV_SOF, cleared by reading SOF_RD) or bus activity arrives! */
-    if ((usb_hw->intr & USB_INTR_DEV_SOF_BITS) != 0u) {
-        (void)usb_hw->sof_rd;
-        usb_hw->sie_status = USB_SIE_STATUS_SUSPENDED_BITS | USB_SIE_STATUS_RESUME_BITS;
-        return false;
-    }
-    uint32_t sie = usb_hw->sie_status;
-    if ((sie & (USB_SIE_STATUS_BUS_RESET_BITS | USB_SIE_STATUS_SETUP_REC_BITS | USB_SIE_STATUS_RESUME_BITS)) != 0u ||
-        usb_hw->buf_status != 0u) {
-        usb_hw->sie_status = USB_SIE_STATUS_SUSPENDED_BITS | USB_SIE_STATUS_RESUME_BITS;
-        return false;
-    }
-    return (sie & USB_SIE_STATUS_SUSPENDED_BITS) != 0u;
-}
-
-static uint32_t sdk_usb_time_us_32(void *ctx) {
-    (void)ctx;
-    return time_us_32();
-}
-
-static void sdk_usb_delay_us(void *ctx, uint32_t us) {
-    (void)ctx;
-    sleep_us(us);
-}
-
 static void sdk_usb_set_pullup(void *ctx, bool en) {
     (void)ctx;
     if (en) {
@@ -354,14 +325,15 @@ static void sdk_usb_on_detach(void *ctx) {
 
 static const usb_vbus_hw_t SDK_USB_VBUS_HW = {
     .read_vbus_det = sdk_usb_read_vbus_det,
-    .is_suspended  = sdk_usb_is_suspended,
-    .time_us_32    = sdk_usb_time_us_32,
-    .delay_us      = sdk_usb_delay_us,
     .set_pullup    = sdk_usb_set_pullup,
     .on_attach     = sdk_usb_on_attach,
     .on_detach     = sdk_usb_on_detach,
     .ctx           = NULL,
 };
+
+bool hal_usb_ep0_is_busy(void) {
+    return usb_ep0_is_busy(&s_ep0);
+}
 
 void hal_usb_init_on_core1(void) {
     reset_block(RESETS_RESET_USBCTRL_BITS);
@@ -392,9 +364,14 @@ void hal_usb_init_on_core1(void) {
 }
 
 void hal_usb_task_on_core1(void) {
-    /* Dynamically gate PULLUP_EN & VBUS_DETECT on PIN_VBUS_DET (with SUSPENDED latch-break probe) */
+    /* Dynamically gate PULLUP_EN & VBUS_DETECT strictly on PIN_VBUS_DET (zero suspend SE0 glitch!) */
     if (!usb_vbus_sync(&s_usb_vbus, &SDK_USB_VBUS_HW)) {
         return;
+    }
+
+    if ((usb_hw->intr & USB_INTR_DEV_SOF_BITS) != 0u) {
+        (void)usb_hw->sof_rd;
+        usb_hw->sie_status = USB_SIE_STATUS_SUSPENDED_BITS | USB_SIE_STATUS_RESUME_BITS;
     }
 
     uint32_t sie = usb_hw->sie_status;
@@ -405,7 +382,6 @@ void hal_usb_task_on_core1(void) {
         usb_ep0_bus_reset(&s_ep0);
         s_ep1_pid = 0u;
         s_ep3_out_pid = 0u;
-        s_usb_vbus.last_probe_us = time_us_32();
         sdk_ep1_out_arm(0u);
         sdk_ep3_out_arm(0u);
     }
