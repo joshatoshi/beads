@@ -1,0 +1,63 @@
+# Beads Pedalboard Skiff — RP2040 Dual-Core Target UF2 + Host Silicon-Mock Test Makefile
+ARM_CC      := arm-none-eabi-gcc
+ARM_NM      := arm-none-eabi-nm
+HOST_CC     := gcc
+BUILD_DIR   := build
+
+CORE_SRCS   := src/bypass_sequencer.c \
+               src/bezier_drift.c \
+               src/dac_mcp4822.c \
+               src/midi_router.c \
+               src/presets.c \
+               src/cv_engine.c \
+               src/oled_ui.c \
+               src/main.c
+
+TARGET_SRCS := $(CORE_SRCS) target/rp2040_startup.c target/rp2040_hal.c
+TARGET_OBJS := $(patsubst %.c,$(BUILD_DIR)/target/%.o,$(TARGET_SRCS))
+
+ARM_CFLAGS  := -mcpu=cortex-m0plus -mthumb -O2 -std=c11 -Iinclude \
+               -Wall -Wextra -Werror -fstack-usage \
+               -ffunction-sections -fdata-sections -DPICO_CORE1_STACK_SIZE=0x1000
+ARM_LDFLAGS := -mcpu=cortex-m0plus -mthumb -T target/rp2040.ld -nostartfiles \
+               -Wl,--gc-sections -Wl,-Map=$(BUILD_DIR)/beads_bridge.map --specs=nano.specs
+
+HOST_CFLAGS := -O2 -std=c11 -Iinclude -Wall -Wextra -Werror -DBEADS_HOST_UNIT_TEST=1
+
+.PHONY: all target test check_symbols check_stack clean
+
+all: target check_symbols check_stack test
+
+target: $(BUILD_DIR)/beads_bridge.uf2
+
+$(BUILD_DIR)/target/%.o: %.c
+	@mkdir -p $(dir $@)
+	$(ARM_CC) $(ARM_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/beads_bridge.elf: $(TARGET_OBJS) target/rp2040.ld
+	$(ARM_CC) $(TARGET_OBJS) $(ARM_LDFLAGS) -o $@
+
+$(BUILD_DIR)/beads_bridge.uf2: $(BUILD_DIR)/beads_bridge.elf tools/elf2uf2.py
+	python3 tools/elf2uf2.py $< $@
+
+# Gate: verify ZERO 64-bit divmod or software float helpers in Core 0 2kHz tick & entire ELF!
+check_symbols: $(BUILD_DIR)/beads_bridge.elf
+	@echo "[CHECK] Verifying zero 64-bit/float soft-helpers in RP2040 ELF..."
+	@if $(ARM_NM) -u $(BUILD_DIR)/beads_bridge.elf $(BUILD_DIR)/target/src/*.o | grep -E '__aeabi_(uldivmod|ldivmod|fadd|fsub|fmul|fdiv|dadd|dsub|dmul|ddiv|i2f|f2iz|ui2f|d2iz)'; then \
+	  echo "[FAIL] Forbidden 64-bit/float helper detected in Core 0 / firmware objects!"; exit 1; \
+	fi
+	@echo "[PASS] Zero 64-bit/float helpers in RP2040 target objects & ELF!"
+
+# Gate: verify every compiled target function's stack frame fits comfortably inside PICO_CORE1_STACK_SIZE (4096 B)!
+check_stack: $(BUILD_DIR)/beads_bridge.elf
+	@python3 -c 'import pathlib, sys; su=list(pathlib.Path("build/target").rglob("*.su")); assert su; worst=0; bad=[]; [bad.append((l.strip(), int(l.split()[1]))) for f in su for l in f.read_text().splitlines() if l.strip() and int(l.split()[1]) > 768]; worst=max(int(l.split()[1]) for f in su for l in f.read_text().splitlines() if l.strip()); print(f"[PASS] -fstack-usage checked ({len(su)} units): max frame = {worst} bytes (<= 768 B inside 4096 B Core 1 stack)"); assert not bad, f"Oversized stack frames: {bad}"'
+
+$(BUILD_DIR)/test_beads_firmware: $(CORE_SRCS) tests/test_beads_firmware.c
+	@mkdir -p $(BUILD_DIR)
+	$(HOST_CC) $(HOST_CFLAGS) $(CORE_SRCS) tests/test_beads_firmware.c -o $@
+
+test: $(BUILD_DIR)/test_beads_firmware
+	./$(BUILD_DIR)/test_beads_firmware
+
+clean:
+	rm -rf $(BUILD_DIR)

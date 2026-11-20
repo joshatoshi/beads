@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "beads_custom")(type "KiCad")(uri "${KIPRJMOD}/../beads_custom.pretty")(options "")(descr "Beads Pedalboard Skiff custom verified footprints"))
+)
