@@ -39,9 +39,10 @@ void     hal_crit_exit(void);
 /* Headerless USB-C UF2 ROM boot (OLED menu "USB FIRMWARE UPDATE" or 1200-baud CDC) */
 void     hal_reset_usb_boot(uint32_t usb_activity_gpio_pin_mask, uint32_t disable_interface_mask);
 
-/* TinyUSB Core 1 lifecycle (tusb_init & tud_task MUST run on the SAME core!) */
+/* TinyUSB / Bare-Metal Core 1 USB lifecycle (init & task MUST run on the SAME core!) */
 void     hal_usb_init_on_core1(void);
 void     hal_usb_task_on_core1(void);
+bool     hal_usb_ep0_is_busy(void);
 bool     hal_usb_midi_read_packet(uint8_t packet4[4]);
 
 #endif /* BEADS_HAL_H */

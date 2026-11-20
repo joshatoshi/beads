@@ -160,6 +160,10 @@ void usb_ep0_bus_reset(usb_ep0_state_t *st) {
     st->expect_line_coding = false;
 }
 
+bool usb_ep0_is_busy(const usb_ep0_state_t *st) {
+    return (st->pending_addr != 0u) || st->tx_active || st->expect_line_coding;
+}
+
 void usb_ep0_handle_setup(usb_ep0_state_t *st, const uint8_t setup[8], const usb_ep0_hw_t *hw) {
     uint8_t  bmReq = setup[0];
     uint8_t  bReq  = setup[1];
@@ -259,17 +263,14 @@ void usb_ep0_on_out_complete(usb_ep0_state_t *st, const uint8_t *rx_buf, uint16_
 
 void usb_vbus_init(usb_vbus_state_t *vs) {
     vs->attached = false;
-    vs->last_probe_us = 0u;
 }
 
 bool usb_vbus_sync(usb_vbus_state_t *vs, const usb_vbus_hw_t *hw) {
     bool vbus = hw->read_vbus_det(hw->ctx);
-    uint32_t now_us = hw->time_us_32(hw->ctx);
 
     if (!vs->attached) {
         if (vbus) {
             vs->attached = true;
-            vs->last_probe_us = now_us;
             hw->on_attach(hw->ctx);
         } else {
             /* Keep PULLUP_EN strictly 0 whenever VBUS_DET is LOW (< 1 uA backfeed!) */
@@ -278,30 +279,13 @@ bool usb_vbus_sync(usb_vbus_state_t *vs, const usb_vbus_hw_t *hw) {
         return vs->attached;
     }
 
-    /* Currently attached: immediate disconnect if VBUS_DET already dropped low */
+    /* Currently attached: D_ESD_VP (1N4148W) reverse-isolates U_USB_ESD Pin 5 (ESD_VP)
+     * from USB_VBUS, so VBUS_DET drops immediately to 0V on hot-unplug even with PULLUP_EN=1.
+     * PULLUP_EN stays continuously asserted throughout USB Suspend (zero SE0 T_DDIS violation!). */
     if (!vbus) {
         vs->attached = false;
         hw->on_detach(hw->ctx);
         return false;
-    }
-
-    /* Hot-unplug latch-break probe: when D+ 1.5 kOhm pull-up is active and the cable
-     * is unplugged into open air, SRV05-4 (IO2/IO3 -> VP) can float USB_VBUS to ~2.55V
-     * (VBUS_DET ~1.53V > V_IL). With no host SOFs, USB_SIE_STATUS.SUSPENDED asserts in
-     * 3 ms; periodically dropping PULLUP_EN=0 for 100 us (>=50 us) discharges floating
-     * USB_VBUS via R25+R26 (25 kOhm) and cleanly breaks the self-latch! */
-    if (!hw->is_suspended(hw->ctx)) {
-        vs->last_probe_us = now_us;
-    } else if ((uint32_t)(now_us - vs->last_probe_us) >= BEADS_USB_UNPLUG_PROBE_PERIOD_US) {
-        vs->last_probe_us = now_us;
-        hw->set_pullup(hw->ctx, false);
-        hw->delay_us(hw->ctx, BEADS_USB_UNPLUG_PROBE_SETTLE_US);
-        if (!hw->read_vbus_det(hw->ctx)) {
-            vs->attached = false;
-            hw->on_detach(hw->ctx);
-            return false;
-        }
-        hw->set_pullup(hw->ctx, true);
     }
     return true;
 }

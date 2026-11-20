@@ -23,13 +23,17 @@ void beads_core0_tick_handler(void) {
     hal_crit_exit();
 }
 
-void beads_core1_service_slice(uint32_t now_ms) {
-    /* 1. TinyUSB task & USB-MIDI RX pump on Core 1 (same core as hal_usb_init_on_core1!) */
+static void beads_core1_pump_usb(void) {
     hal_usb_task_on_core1();
     uint8_t pkt4[4];
     while (hal_usb_midi_read_packet(pkt4)) {
         (void)midi_router_usb_push_packet(&g_midi, pkt4);
     }
+}
+
+void beads_core1_service_slice(uint32_t now_ms) {
+    /* 1. Continuous USB EP0/MIDI service on Core 1 (< 500 us max latency << 2.0 ms t_DSETADDR!) */
+    beads_core1_pump_usb();
 
     /* 2. Consume encoder / button events safely under critical section */
     int32_t enc_d = 0;
@@ -45,14 +49,28 @@ void beads_core1_service_slice(uint32_t now_ms) {
     g_engine.back_click_ev = false;
     hal_crit_exit();
 
-    oled_ui_handle_inputs(&g_ui, enc_d, enc_c, back_c, &g_engine, &g_bypass, &g_midi, &g_presets);
+    bool input_ev = (enc_d != 0) || enc_c || back_c;
+    if (input_ev) {
+        oled_ui_handle_inputs(&g_ui, enc_d, enc_c, back_c, &g_engine, &g_bypass, &g_midi, &g_presets);
+    }
 
-    /* 3. Render (under lock snapshot) & flush 1 page slice of SSD1306 (bounded I2C timeout) */
-    bool vbus = hal_gpio_read(PIN_VBUS_DET);
-    hal_crit_enter();
-    oled_ui_render(&g_ui, &g_engine, &g_bypass, &g_presets, vbus);
-    hal_crit_exit();
-    (void)oled_ui_flush_one_page(&g_ui);
+    /* 3. Rate-gated UI render (>= 2000 us timer or input event) + EP0-deferred 16-byte chunked I2C flush:
+     *    - Defers OLED I2C completely while any EP0 control transfer is active (SET_ADDRESS / GET_DESCRIPTOR / CDC)
+     *    - Transmits at most ONE 16-byte SSD1306 chunk (~405 us @ 400 kHz) per slice, then immediately re-polls USB! */
+    uint32_t now_us = hal_time_us_32();
+    if (!g_ui.rendered_once || input_ev || ((uint32_t)(now_us - g_ui.last_render_us) >= UI_RENDER_PERIOD_US)) {
+        bool vbus = hal_gpio_read(PIN_VBUS_DET);
+        hal_crit_enter();
+        oled_ui_render(&g_ui, &g_engine, &g_bypass, &g_presets, vbus);
+        hal_crit_exit();
+        g_ui.rendered_once = true;
+        g_ui.last_render_us = now_us;
+    }
+
+    if (g_ui.dirty && !hal_usb_ep0_is_busy()) {
+        (void)oled_ui_flush_step(&g_ui);
+        beads_core1_pump_usb();
+    }
 
     /* 4. Idle-deferred dual-slot A/B CRC32 QSPI Flash save:
      * Re-sample live bypass_seq_is_idle(&g_bypass), pending MIDI bypass/preset & ring flags,
@@ -101,19 +119,18 @@ oled_ui_t     *beads_test_get_ui(void)      { return &g_ui; }
 #ifndef BEADS_HOST_UNIT_TEST
 /* Target RP2040 entrypoint (also supports Pico SDK multicore_launch_core1 when built with PICO_SDK) */
 extern void rp2040_launch_core1(void (*entry)(void));
-extern void rp2040_delay_us(uint32_t us);
 extern void rp2040_core0_service_lockout(void);
 
 static void core1_entry(void) {
     hal_usb_init_on_core1();
     oled_ui_init(&g_ui);
     for (;;) {
-        /* Share exact Core 0 monotonic millisecond timebase -> zero drift or underflow! */
+        /* Continuous non-blocking Core 1 USB + chunked-OLED loop (zero blocking delay_us,
+         * guaranteeing < 500 us worst-case USB SET_ADDRESS recovery << 2.0 ms USB 2.0 §9.2.6.3!) */
         hal_crit_enter();
         uint32_t shared_now_ms = g_engine.tick_count >> 1u;
         hal_crit_exit();
         beads_core1_service_slice(shared_now_ms);
-        rp2040_delay_us(2000u);
     }
 }
 

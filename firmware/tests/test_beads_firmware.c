@@ -33,10 +33,20 @@ static uint32_t g_uart_hw_tail = 0u;
 static uint8_t  g_flash_slots[2][4096];
 static uint32_t g_flash_writes = 0u;
 static uint32_t g_i2c_writes = 0u;
+static size_t   g_i2c_max_runtime_len = 0u;
+static bool     g_i2c_model_wire_time = false;
 static void   (*g_i2c_hook)(void) = NULL;
 static bool     g_usb_boot_called = false;
 static bool     g_spi_pwr_safe_enabled = false;
 static int      g_crit_depth = 0;
+
+/* Host Core 1 USB polling & EP0 latency monitor */
+static uint32_t g_usb_task_polls = 0u;
+static uint32_t g_usb_last_poll_us = 0u;
+static uint32_t g_usb_max_poll_gap_us = 0u;
+static bool     g_usb_track_latency = false;
+static void   (*g_usb_task_hook)(void) = NULL;
+static bool     g_mock_ep0_busy = false;
 
 void hal_init(void) {
     memset(g_gpio_in, 0, sizeof(g_gpio_in));
@@ -90,6 +100,14 @@ bool hal_i2c0_write_timeout(uint8_t addr7, const uint8_t *buf, size_t len, uint3
     assert(addr7 == OLED_I2C_ADDR);
     assert(buf != NULL && len > 0u && timeout_us > 0u);
     g_i2c_writes++;
+    if (g_i2c_model_wire_time) {
+        if (len > g_i2c_max_runtime_len) {
+            g_i2c_max_runtime_len = len;
+        }
+        /* Exact 400 kHz I2C wire time: (1 addr byte + len payload bytes) * 9 bits / 0.4 MHz = 22.5 us/byte */
+        uint32_t wire_us = (uint32_t)(((len + 1u) * 45u + 1u) >> 1u);
+        g_now_us += wire_us;
+    }
     if (g_i2c_hook != NULL) {
         g_i2c_hook();
     }
@@ -127,7 +145,20 @@ void hal_reset_usb_boot(uint32_t m1, uint32_t m2) {
 }
 
 void hal_usb_init_on_core1(void) {}
-void hal_usb_task_on_core1(void) {}
+void hal_usb_task_on_core1(void) {
+    g_usb_task_polls++;
+    if (g_usb_track_latency) {
+        uint32_t gap = g_now_us - g_usb_last_poll_us;
+        if (gap > g_usb_max_poll_gap_us) {
+            g_usb_max_poll_gap_us = gap;
+        }
+        g_usb_last_poll_us = g_now_us;
+    }
+    if (g_usb_task_hook != NULL) {
+        g_usb_task_hook();
+    }
+}
+bool hal_usb_ep0_is_busy(void) { return g_mock_ep0_busy; }
 bool hal_usb_midi_read_packet(uint8_t pkt4[4]) { (void)pkt4; return false; }
 
 /* ============================================================================
@@ -520,12 +551,12 @@ static void test_integrated_dual_core_engine(void) {
     }
     assert(g_gpio_out[PIN_LED_FS2_STATUS]); /* Stays latched after release! */
 
-    /* Exercise Core 1 OLED 8-page flush + USB task + idle Flash poll */
+    /* Exercise Core 1 chunked OLED 8-page flush (8 pages * 9 <=16B steps = 72 steps) + USB task + idle Flash poll */
     uint32_t i2c_before = g_i2c_writes;
-    for (uint32_t page = 0u; page < OLED_PAGES; page++) {
-        beads_core1_service_slice(1000u + page * 10u);
+    for (uint32_t step = 0u; step < OLED_PAGES * (1u + OLED_CHUNKS_PER_PAGE); step++) {
+        beads_core1_service_slice(1000u + step);
     }
-    assert(g_i2c_writes >= i2c_before + OLED_PAGES * 2u);
+    assert(g_i2c_writes == i2c_before + OLED_PAGES * (1u + OLED_CHUNKS_PER_PAGE));
     assert(g_spi_pwr_safe_enabled);
     printf("[PASS] Test 7: Integrated Dual-Core Core0(2kHz)+Core1 loop (POR, ADC0 pluck/PEAK, FS2 Freeze, OLED)\n");
 }
@@ -777,33 +808,22 @@ static void test_oled_ui_complete_and_midi_div6(void) {
 }
 
 /* ============================================================================
- * TEST 10: Dynamic PIN_VBUS_DET USB PULLUP_EN Gating & Hot-Unplug Latch Probe
+ * TEST 10: Dynamic PIN_VBUS_DET USB PULLUP_EN Gating & Zero Suspend SE0 Glitch
  * ============================================================================ */
 typedef struct {
     bool     host_vbus_present;
-    bool     self_latch_enabled; /* Models SRV05-4 IO2/IO3->VP backfeed keeping VBUS_DET high while pullup=1 */
     bool     suspended;
     bool     pullup_en;
     uint32_t now_us;
-    uint32_t last_delay_us;
     uint32_t attach_cnt;
     uint32_t detach_cnt;
     uint32_t pullup_drop_cnt;
 } mock_vbus_hw_t;
 
 static bool mv_read_vbus(void *ctx) {
-    mock_vbus_hw_t *m = (mock_vbus_hw_t *)ctx;
-    if (m->host_vbus_present) return true;
-    /* When cable is unplugged into open air and PULLUP_EN=1, SRV05-4 back-feeds ~1.53V onto VBUS_DET!
-     * Clearing PULLUP_EN=0 discharges R25+R26 -> VBUS_DET drops to 0V! */
-    return m->self_latch_enabled && m->pullup_en;
-}
-static bool     mv_is_susp(void *ctx)  { return ((mock_vbus_hw_t *)ctx)->suspended; }
-static uint32_t mv_time_us(void *ctx)  { return ((mock_vbus_hw_t *)ctx)->now_us; }
-static void     mv_delay_us(void *ctx, uint32_t us) {
-    mock_vbus_hw_t *m = (mock_vbus_hw_t *)ctx;
-    m->last_delay_us = us;
-    m->now_us += us;
+    /* With D_ESD_VP (1N4148W) reverse-isolating U_USB_ESD Pin 5 (ESD_VP) from USB_VBUS,
+     * PIN_VBUS_DET tracks true USB_VBUS with 0 self-latch even when PULLUP_EN = 1! */
+    return ((mock_vbus_hw_t *)ctx)->host_vbus_present;
 }
 static void mv_set_pullup(void *ctx, bool en) {
     mock_vbus_hw_t *m = (mock_vbus_hw_t *)ctx;
@@ -824,14 +844,10 @@ static void mv_on_detach(void *ctx) {
 static void test_usb_vbus_gating_and_latch_probe(void) {
     mock_vbus_hw_t m;
     memset(&m, 0, sizeof(m));
-    m.self_latch_enabled = true;
     m.now_us = 10000u;
 
     usb_vbus_hw_t hw = {
         .read_vbus_det = mv_read_vbus,
-        .is_suspended  = mv_is_susp,
-        .time_us_32    = mv_time_us,
-        .delay_us      = mv_delay_us,
         .set_pullup    = mv_set_pullup,
         .on_attach     = mv_on_attach,
         .on_detach     = mv_on_detach,
@@ -850,46 +866,39 @@ static void test_usb_vbus_gating_and_latch_probe(void) {
     assert(usb_vbus_sync(&vs, &hw));
     assert(vs.attached && m.pullup_en && m.attach_cnt == 1u);
 
-    /* 3. Active USB traffic (SUSPENDED=0) for 1 second -> PULLUP_EN NEVER drops! */
+    /* 3. Active USB traffic (SUSPENDED=0) across 1.0 second -> PULLUP_EN NEVER drops! */
     m.suspended = false;
-    for (int i = 0; i < 20; i++) {
-        m.now_us += 50000u;
+    for (int i = 0; i < 2000; i++) {
+        m.now_us += 500u;
         assert(usb_vbus_sync(&vs, &hw));
     }
     assert(vs.attached && m.pullup_en && m.pullup_drop_cnt == 0u && m.detach_cnt == 0u);
 
-    /* 4. Real host enters USB Suspend while keeping +5V VBUS live -> probe after 250ms keeps link attached */
+    /* 4. Host enters USB 2.0 Suspend (SUSPENDED=1) for 2.0 full seconds (>= 1 s requirement):
+     *    ZERO set_pullup(false) SE0 glitches may ever occur (USB 2.0 §7.1.7.3 T_DDIS = 2.5 us)! */
     m.suspended = true;
-    m.now_us += BEADS_USB_UNPLUG_PROBE_PERIOD_US - 1000u;
-    assert(usb_vbus_sync(&vs, &hw));
-    assert(m.pullup_drop_cnt == 0u); /* Not yet due */
-    m.now_us += 2000u;
-    assert(usb_vbus_sync(&vs, &hw));
-    assert(m.pullup_drop_cnt == 1u && m.last_delay_us >= 50u);
-    assert(vs.attached && m.pullup_en && m.detach_cnt == 0u);
+    for (int i = 0; i < 4000; i++) {
+        m.now_us += 500u;
+        assert(usb_vbus_sync(&vs, &hw));
+        assert(vs.attached && m.pullup_en && m.pullup_drop_cnt == 0u && m.detach_cnt == 0u);
+    }
 
-    /* 5. Hot-unplug into open air while SRV05-4 self-latches VBUS_DET=HIGH -> SUSPENDED probe breaks latch! */
+    /* 5. Hot-unplug cable (D_ESD_VP blocks backfeed so PIN_VBUS_DET drops immediately to 0V) -> immediate clean detach! */
     m.host_vbus_present = false;
-    m.suspended = true;
-    assert(mv_read_vbus(&m)); /* Confirm self-latch is actively fooling naive GPIO read! */
-    m.now_us += BEADS_USB_UNPLUG_PROBE_PERIOD_US + 1000u;
+    m.now_us += 500u;
     assert(!usb_vbus_sync(&vs, &hw));
-    assert(!vs.attached && !m.pullup_en && m.detach_cnt == 1u && m.last_delay_us >= 50u);
-    assert(!mv_read_vbus(&m)); /* Latch permanently broken: 0V VBUS_DET, <1 uA backfeed! */
+    assert(!vs.attached && !m.pullup_en && m.detach_cnt == 1u && m.pullup_drop_cnt == 0u);
 
-    /* 6. Re-attach then immediate host power-off (low-Z 0V VBUS, no self-latch) -> immediate detach! */
+    /* 6. Re-attach then host power-off -> clean re-attach & detach */
     m.host_vbus_present = true;
     m.suspended = false;
-    m.now_us += 5000u;
     assert(usb_vbus_sync(&vs, &hw));
     assert(vs.attached && m.pullup_en && m.attach_cnt == 2u);
     m.host_vbus_present = false;
-    m.self_latch_enabled = false;
-    m.now_us += 1000u;
     assert(!usb_vbus_sync(&vs, &hw));
     assert(!vs.attached && !m.pullup_en && m.detach_cnt == 2u);
 
-    printf("[PASS] Test 10: Dynamic PIN_VBUS_DET PULLUP_EN gating, SUSPENDED >=50us hot-unplug latch break & clean detach\n");
+    printf("[PASS] Test 10: Dynamic PIN_VBUS_DET gating, ZERO set_pullup(false) glitches over 2.0s USB Suspend & clean detach\n");
 }
 
 /* ============================================================================
@@ -989,6 +998,147 @@ static void test_core1_toctou_flash_lockout_guards(void) {
     printf("[PASS] Test 11: Core 1 TOCTOU Flash lockout guards (target!=current, mid-I2C MIDI, pending ring, signed delta)\n");
 }
 
+/* ============================================================================
+ * TEST 12: Core 1 USB 2.0 §9.2.6.3 SET_ADDRESS Recovery (< 500 us << 2.0 ms),
+ * <=16-Byte Chunked SSD1306 I2C Writes, EP0-Active I2C Deferral & Dirty Gating
+ * ============================================================================ */
+static struct {
+    usb_ep0_state_t ep0;
+    mock_usb_hw_t   hw_ctx;
+    usb_ep0_hw_t    hw;
+    bool            setup_injected;
+    uint32_t        t_setup_arrived_us;
+    uint32_t        t_status_zlp_ready_us;
+    uint32_t        t_addr_latched_us;
+    uint32_t        i2c_writes_while_ep0_busy;
+} g_setaddr_sim;
+
+static void sim_core1_usb_setaddr_task(void) {
+    /* Sync mock EP0 busy state to real usb_ep0_is_busy(&ep0) */
+    if (!g_setaddr_sim.setup_injected) {
+        g_mock_ep0_busy = false;
+        return;
+    }
+    /* Step A: Host SETUP(SET_ADDRESS = 9) arrives in USB SIE while OLED is mid-flush */
+    if (g_setaddr_sim.t_status_zlp_ready_us == 0u) {
+        uint8_t setup_addr9[8] = { 0x00u, 0x05u, 9u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u };
+        usb_ep0_handle_setup(&g_setaddr_sim.ep0, setup_addr9, &g_setaddr_sim.hw);
+        assert(usb_ep0_is_busy(&g_setaddr_sim.ep0));
+        g_mock_ep0_busy = usb_ep0_is_busy(&g_setaddr_sim.ep0);
+        /* Host clocks Status IN ZLP 125 us (1 USB microframe) after device queues ZLP */
+        g_setaddr_sim.t_status_zlp_ready_us = g_now_us + 125u;
+        return;
+    }
+    /* Step B: Once Status IN ZLP completes on bus, BUFF_STATUS bit 0 fires usb_ep0_on_in_complete */
+    if (g_setaddr_sim.hw_ctx.addr == 0u && (int32_t)(g_now_us - g_setaddr_sim.t_status_zlp_ready_us) >= 0) {
+        usb_ep0_on_in_complete(&g_setaddr_sim.ep0, &g_setaddr_sim.hw);
+        g_setaddr_sim.t_addr_latched_us = g_now_us;
+    }
+    g_mock_ep0_busy = usb_ep0_is_busy(&g_setaddr_sim.ep0);
+}
+
+static void sim_mid_chunk_setup_arrival(void) {
+    if (g_setaddr_sim.setup_injected) {
+        if (g_mock_ep0_busy) {
+            g_setaddr_sim.i2c_writes_while_ep0_busy++;
+        }
+        return;
+    }
+    /* Worst-case arrival: host sends SETUP(SET_ADDRESS=9) 20 us after a 16-byte OLED I2C chunk started! */
+    oled_ui_t *ui = beads_test_get_ui();
+    if (ui->flush_page == 2u && ui->flush_substep == 3u) {
+        g_setaddr_sim.setup_injected = true;
+        /* g_now_us was already advanced by +405 us wire time inside hal_i2c0_write_timeout;
+         * SETUP arrived 385 us ago (20 us into the 405 us I2C burst)! */
+        g_setaddr_sim.t_setup_arrived_us = g_now_us - 385u;
+    }
+}
+
+static void test_core1_usb_set_address_latency_and_chunked_oled(void) {
+    hal_init();
+    memset(g_flash_slots, 0xFF, sizeof(g_flash_slots));
+    g_now_us = 50000u;
+    beads_app_init();
+    g_gpio_in[PIN_VBUS_DET] = true;
+
+    oled_ui_t *ui = beads_test_get_ui();
+    oled_ui_init(ui);
+
+    memset(&g_setaddr_sim, 0, sizeof(g_setaddr_sim));
+    usb_ep0_init(&g_setaddr_sim.ep0);
+    g_setaddr_sim.hw = (usb_ep0_hw_t){
+        m_ep0_tx, m_ep0_rx_arm, m_ep0_stall, m_set_addr, m_on_cfg, m_on_1200, &g_setaddr_sim.hw_ctx
+    };
+
+    g_i2c_max_runtime_len = 0u;
+    g_i2c_model_wire_time = true;
+    g_usb_track_latency = true;
+    g_usb_last_poll_us = g_now_us;
+    g_usb_max_poll_gap_us = 0u;
+    g_usb_task_hook = sim_core1_usb_setaddr_task;
+    g_i2c_hook = sim_mid_chunk_setup_arrival;
+    g_mock_ep0_busy = false;
+
+    /* Run continuous Core 1 loop across full 8-page OLED flush while mid-chunk SET_ADDRESS arrives! */
+    for (int iter = 0; iter < 400; iter++) {
+        /* 2 us CPU overhead per tight non-I2C Core 1 poll iteration */
+        g_now_us += 2u;
+        beads_core1_service_slice(g_now_us >> 10u);
+        if (!ui->dirty && g_setaddr_sim.hw_ctx.addr == 9u) {
+            break;
+        }
+    }
+
+    g_i2c_model_wire_time = false;
+    g_usb_track_latency = false;
+    g_usb_task_hook = NULL;
+    g_i2c_hook = NULL;
+    g_mock_ep0_busy = false;
+
+    /* 1. Every runtime OLED I2C transaction MUST be <= 17 bytes (1 ctrl + 16 pixels = 405 us @ 400 kHz) */
+    assert(g_i2c_max_runtime_len == (1u + OLED_I2C_CHUNK_BYTES));
+    assert(g_i2c_max_runtime_len <= 17u);
+
+    /* 2. Worst-case gap between hal_usb_task_on_core1() polls MUST be < 500 us (<< 2000 us)! */
+    assert(g_usb_max_poll_gap_us < 500u);
+
+    /* 3. SET_ADDRESS=9 MUST be latched with ZERO I2C writes while EP0 was busy,
+     *    total end-to-end latency < 600 us (< 1.0 ms << 2.0 ms USB 2.0 §9.2.6.3 t_DSETADDR),
+     *    and post-ZLP recovery latency < 50 us! */
+    assert(g_setaddr_sim.setup_injected);
+    assert(g_setaddr_sim.hw_ctx.addr == 9u);
+    assert(g_setaddr_sim.i2c_writes_while_ep0_busy == 0u);
+    uint32_t total_setaddr_us = g_setaddr_sim.t_addr_latched_us - g_setaddr_sim.t_setup_arrived_us;
+    uint32_t post_zlp_recovery_us = g_setaddr_sim.t_addr_latched_us - g_setaddr_sim.t_status_zlp_ready_us;
+    assert(total_setaddr_us < 600u);
+    assert(post_zlp_recovery_us < 50u);
+
+    /* 4. All 8 dirty pages finished flushing cleanly after EP0 cleared, and static UI now does 0 I2C writes! */
+    assert(!ui->dirty && ui->page_dirty_mask == 0u);
+    assert(memcmp(ui->fb, ui->sent_fb, OLED_FB_BYTES) == 0);
+    uint32_t i2c_steady = g_i2c_writes;
+    /* Switch to static UI_PAGE_SYSTEM, flush its delta once, then verify 50 ms of steady state does 0 I2C writes */
+    cv_engine_t *eng = beads_test_get_engine();
+    eng->back_click_ev = true;
+    for (int iter = 0; iter < 80; iter++) {
+        g_now_us += 100u;
+        beads_core1_service_slice(g_now_us >> 10u);
+    }
+    assert(ui->page == UI_PAGE_SYSTEM && !ui->dirty);
+    i2c_steady = g_i2c_writes;
+    for (int iter = 0; iter < 100; iter++) {
+        g_now_us += 500u; /* 50 ms elapsed (> 25 render periods), zero pixel changes! */
+        beads_core1_service_slice(g_now_us >> 10u);
+    }
+    assert(g_i2c_writes == i2c_steady);
+
+    printf(
+        "[PASS] Test 12: Core 1 USB SET_ADDRESS latency=%uus (<600us << 2000us, post-ZLP=%uus), "
+        "max poll gap=%uus (<500us), <=16B OLED chunks & 0 static I2C writes\n",
+        (unsigned)total_setaddr_us, (unsigned)post_zlp_recovery_us, (unsigned)g_usb_max_poll_gap_us
+    );
+}
+
 int main(void) {
     test_bypass_por_photomos_and_flexi();
     test_bezier_c1_continuity();
@@ -1001,6 +1151,7 @@ int main(void) {
     test_oled_ui_complete_and_midi_div6();
     test_usb_vbus_gating_and_latch_probe();
     test_core1_toctou_flash_lockout_guards();
-    printf("ALL 11 FIRMWARE SILICON-MOCK UNIT TEST SUITES PASSED (100%% ASSERTIONS)!\n");
+    test_core1_usb_set_address_latency_and_chunked_oled();
+    printf("ALL 12 FIRMWARE SILICON-MOCK UNIT TEST SUITES PASSED (100%% ASSERTIONS)!\n");
     return 0;
 }

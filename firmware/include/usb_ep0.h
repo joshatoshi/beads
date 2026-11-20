@@ -16,8 +16,6 @@
 
 #define BEADS_USB_EP0_MAX_PKT            64u
 #define BEADS_USB_CFG_DESC_LEN           146u
-#define BEADS_USB_UNPLUG_PROBE_PERIOD_US 250000u /* >= USB 2.0 T_ATTDB (100 ms) */
-#define BEADS_USB_UNPLUG_PROBE_SETTLE_US 100u    /* >= 50 us (>= 4*tau on R25+R26=25k) */
 
 extern const uint8_t BEADS_USB_DEV_DESC[18];
 extern const uint8_t BEADS_USB_CFG_DESC[BEADS_USB_CFG_DESC_LEN];
@@ -25,21 +23,18 @@ extern const uint8_t BEADS_USB_STR_LANG[4];
 extern const uint8_t BEADS_USB_STR_MFR[26];
 extern const uint8_t BEADS_USB_STR_PROD[38];
 
-/* Dynamic PIN_VBUS_DET USB attach/detach & hot-unplug SRV05-4 latch-break FSM */
+/* Dynamic PIN_VBUS_DET USB attach/detach FSM (with D_ESD_VP hardware reverse isolation,
+ * PULLUP_EN stays continuously asserted across USB Suspend with zero SE0 glitch!) */
 typedef struct {
-    bool     attached;
-    uint32_t last_probe_us;
+    bool attached;
 } usb_vbus_state_t;
 
 typedef struct {
-    bool     (*read_vbus_det)(void *ctx);
-    bool     (*is_suspended)(void *ctx);
-    uint32_t (*time_us_32)(void *ctx);
-    void     (*delay_us)(void *ctx, uint32_t us);
-    void     (*set_pullup)(void *ctx, bool en);
-    void     (*on_attach)(void *ctx);
-    void     (*on_detach)(void *ctx);
-    void     *ctx;
+    bool (*read_vbus_det)(void *ctx);
+    void (*set_pullup)(void *ctx, bool en);
+    void (*on_attach)(void *ctx);
+    void (*on_detach)(void *ctx);
+    void *ctx;
 } usb_vbus_hw_t;
 
 void usb_vbus_init(usb_vbus_state_t *vs);
@@ -71,6 +66,7 @@ typedef struct {
 
 void usb_ep0_init(usb_ep0_state_t *st);
 void usb_ep0_bus_reset(usb_ep0_state_t *st);
+bool usb_ep0_is_busy(const usb_ep0_state_t *st);
 void usb_ep0_handle_setup(usb_ep0_state_t *st, const uint8_t setup[8], const usb_ep0_hw_t *hw);
 void usb_ep0_on_in_complete(usb_ep0_state_t *st, const usb_ep0_hw_t *hw);
 void usb_ep0_on_out_complete(usb_ep0_state_t *st, const uint8_t *rx_buf, uint16_t rx_len, const usb_ep0_hw_t *hw);

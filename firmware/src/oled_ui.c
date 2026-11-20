@@ -143,10 +143,12 @@ static void fmt_sub_mode(char *buf, const cv_channel_cfg_t *c) {
 
 void oled_ui_init(oled_ui_t *ui) {
     memset(ui, 0, sizeof(*ui));
+    memset(ui->scope_hist, 38u, sizeof(ui->scope_hist)); /* Centerline Y=38 (0.00V) on boot */
     ui->page = UI_PAGE_SCOPE;
+    ui->page_dirty_mask = 0xFFu;
     ui->dirty = true;
-    /* Bounded I2C timeout (2 ms) so absent/unplugged OLED never hangs Core 1! */
-    (void)hal_i2c0_write_timeout(OLED_I2C_ADDR, OLED_INIT_SEQ, sizeof(OLED_INIT_SEQ), 2000u);
+    /* Bounded I2C timeout (1.5 ms) so absent/unplugged OLED never hangs Core 1! */
+    (void)hal_i2c0_write_timeout(OLED_I2C_ADDR, OLED_INIT_SEQ, sizeof(OLED_INIT_SEQ), 1500u);
 }
 
 void oled_ui_handle_usb_cdc_line_coding(oled_ui_t *ui, uint32_t bit_rate) {
@@ -528,23 +530,98 @@ void oled_ui_render(oled_ui_t *ui, const cv_engine_t *eng, const bypass_seq_t *b
             fb_set_pixel(ui, x, (uint8_t)(row_y + 9u));
         }
     }
-    ui->dirty = true;
+
+    /* Compute real per-page dirty bitmask against last transmitted SSD1306 bytes (0 stack allocation!) */
+    for (uint8_t p = 0u; p < OLED_PAGES; p++) {
+        uint8_t bit = (uint8_t)(1u << p);
+        const uint8_t *cur_p = &ui->fb[(uint16_t)p * OLED_WIDTH];
+        const uint8_t *old_p = &ui->sent_fb[(uint16_t)p * OLED_WIDTH];
+        if ((ui->page_sent_mask & bit) == 0u || memcmp(cur_p, old_p, OLED_WIDTH) != 0) {
+            ui->page_dirty_mask |= bit;
+        }
+    }
+    ui->dirty = (ui->page_dirty_mask != 0u);
+}
+
+bool oled_ui_flush_step(oled_ui_t *ui) {
+    /* Sends AT MOST ONE <=16-pixel-byte I2C burst (~405 us @ 400 kHz, << 2.0 ms USB t_DSETADDR!) */
+    if (ui->page_dirty_mask == 0u) {
+        ui->dirty = false;
+        ui->flush_substep = 0u;
+        return true;
+    }
+
+    if (ui->flush_substep == 0u) {
+        /* Advance flush_page to the next actually dirty page */
+        for (uint8_t i = 0u; i < OLED_PAGES; i++) {
+            uint8_t cand = (uint8_t)((ui->flush_page + i) & 0x07u);
+            if ((ui->page_dirty_mask & (uint8_t)(1u << cand)) != 0u) {
+                ui->flush_page = cand;
+                break;
+            }
+        }
+        uint8_t p = ui->flush_page & 0x07u;
+        uint8_t cmd[4] = { 0x00u, (uint8_t)(0xB0u | p), 0x00u, 0x10u };
+        if (!hal_i2c0_write_timeout(OLED_I2C_ADDR, cmd, sizeof(cmd), 600u)) {
+            return false;
+        }
+        ui->flush_substep = 1u;
+        return true;
+    }
+
+    uint8_t p = ui->flush_page & 0x07u;
+    uint8_t chunk_idx = (uint8_t)(ui->flush_substep - 1u);
+    if (chunk_idx >= OLED_CHUNKS_PER_PAGE) {
+        ui->flush_substep = 0u;
+        return true;
+    }
+
+    uint16_t off = (uint16_t)p * OLED_WIDTH + (uint16_t)chunk_idx * OLED_I2C_CHUNK_BYTES;
+    uint8_t pkt[1u + OLED_I2C_CHUNK_BYTES];
+    pkt[0] = 0x40u;
+    memcpy(&pkt[1], &ui->fb[off], OLED_I2C_CHUNK_BYTES);
+    bool ok = hal_i2c0_write_timeout(OLED_I2C_ADDR, pkt, sizeof(pkt), 700u);
+    if (ok) {
+        memcpy(&ui->sent_fb[off], &pkt[1], OLED_I2C_CHUNK_BYTES);
+    }
+    ui->flush_substep++;
+    if (ui->flush_substep > OLED_CHUNKS_PER_PAGE) {
+        ui->flush_substep = 0u;
+        uint8_t bit = (uint8_t)(1u << p);
+        if (ok) {
+            ui->page_sent_mask |= bit;
+            /* Re-verify whether ui->fb[p] mutated again mid-page before clearing dirty bit */
+            if (memcmp(&ui->fb[(uint16_t)p * OLED_WIDTH], &ui->sent_fb[(uint16_t)p * OLED_WIDTH], OLED_WIDTH) == 0) {
+                ui->page_dirty_mask &= (uint8_t)~bit;
+            }
+        }
+        ui->flush_page = (uint8_t)((p + 1u) & 0x07u);
+        if (ui->page_dirty_mask == 0u) {
+            ui->dirty = false;
+        }
+    }
+    return ok;
 }
 
 bool oled_ui_flush_one_page(oled_ui_t *ui) {
-    /* Sends exactly ONE 128-byte OLED page per call (< 3.5 ms @ 400 kHz I2C, bounded timeout!) */
-    uint8_t p = ui->flush_page & 0x07u;
-    uint8_t cmd[4] = { 0x00u, (uint8_t)(0xB0u | p), 0x00u, 0x10u };
-    if (!hal_i2c0_write_timeout(OLED_I2C_ADDR, cmd, sizeof(cmd), 1500u)) {
-        return false;
-    }
-    uint8_t data_pkt[1u + OLED_WIDTH];
-    data_pkt[0] = 0x40u;
-    memcpy(&data_pkt[1], &ui->fb[(uint16_t)p * OLED_WIDTH], OLED_WIDTH);
-    bool ok = hal_i2c0_write_timeout(OLED_I2C_ADDR, data_pkt, sizeof(data_pkt), 4000u);
-    ui->flush_page = (uint8_t)((p + 1u) & 0x07u);
-    if (ui->flush_page == 0u) {
+    /* Convenience wrapper that flushes 1 dirty page in <=16-byte chunks while servicing USB between chunks */
+    if (ui->page_dirty_mask == 0u) {
         ui->dirty = false;
+        return true;
     }
-    return ok;
+    bool all_ok = true;
+    for (uint8_t step = 0u; step < (1u + OLED_CHUNKS_PER_PAGE); step++) {
+        if (hal_usb_ep0_is_busy()) {
+            break;
+        }
+        if (!oled_ui_flush_step(ui)) {
+            all_ok = false;
+            break;
+        }
+        hal_usb_task_on_core1();
+        if (ui->flush_substep == 0u) {
+            break;
+        }
+    }
+    return all_ok;
 }

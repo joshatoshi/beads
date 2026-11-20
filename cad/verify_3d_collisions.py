@@ -135,6 +135,7 @@ def main() -> int:
         "J_BTB_AUDIO_CV_mb_header", "J_BTB_AUDIO_CV_mz_socket",
         "J_BTB_UI_DIG_mb_header", "J_BTB_UI_DIG_mz_socket",
         "R117", "R119", "U_MCU", "U_PMIC", "U_BUCK5", "U_LDO_P12", "U_LDO_N12", "U_MUTE_L", "U_MUTE_R", "SW_BOOT",
+        "D_ESD_VP", "C100", "C93", "R144", "C94", "C95", "C96", "C97", "C98", "C99",
     ]
     for mk in mandatory_keys:
         assert mk in solids_map, f"Missing mandatory un-grouped solid in 3D audit: {mk}"
@@ -244,7 +245,17 @@ def main() -> int:
         and not k.startswith(("INS_", "BOLT_", "J_SEND_", "J_RET_", "J_CV"))
     ]
     smd_set = set(smd_keys)
-    assert len(smd_keys) == 296, f"Expected all 296 main_board SMD component solids, got {len(smd_keys)}"
+    import pcbnew
+    mb_pcb = pcbnew.LoadBoard(str(ROOT / "hardware" / "main_board" / "main_board.kicad_pcb"))
+    expected_smd_count = sum(
+        1 for fp in mb_pcb.GetFootprints()
+        if any(p.GetAttribute() == pcbnew.PAD_ATTRIB_SMD for p in fp.Pads())
+        and fp.GetReference() not in ("J_USB", "C18", "C22", "L1", "L2", "L3", "K1", "K2")
+        and not fp.GetReference().startswith(("MH", "TP"))
+    )
+    assert len(smd_keys) == expected_smd_count and expected_smd_count >= 306, (
+        f"Expected all {expected_smd_count} main_board SMD component solids, got {len(smd_keys)}"
+    )
 
     bbs = {k: solids_map[k][0].bounding_box() for k in names}
     total_pairs = len(names) * (len(names) - 1) // 2
