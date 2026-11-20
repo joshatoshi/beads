@@ -430,6 +430,74 @@ def check_schematic_bounds_and_netlists() -> None:
     )
 
 
+def check_plated_slots_dfm() -> None:
+    """Gate 1.7: Enforce JLCPCB 2-layer plated-slot DFM (width >= 0.50 mm, and L >= 2*W on
+    main_board / narrow slots) across BOTH KiCad PCB oblong drills and exported *-PTH.drl files."""
+    checked_pcb_slots = 0
+    for bname in ("main_board", "ui_mezzanine"):
+        b = pcbnew.LoadBoard(str(ROOT / "hardware" / bname / f"{bname}.kicad_pcb"))
+        for fp in b.GetFootprints():
+            ref = fp.GetReference()
+            for p in fp.Pads():
+                if p.GetAttribute() != pcbnew.PAD_ATTRIB_PTH:
+                    continue
+                if p.GetDrillShape() != pcbnew.PAD_DRILL_SHAPE_OBLONG:
+                    continue
+                dx = pcbnew.ToMM(p.GetDrillSize().x)
+                dy = pcbnew.ToMM(p.GetDrillSize().y)
+                w, l = min(dx, dy), max(dx, dy)
+                assert w >= 0.50 - 1e-6, (
+                    f"PCB plated slot {bname}:{ref}.{p.GetName()} width {w:.3f} mm < 0.50 mm JLCPCB 2-layer min!"
+                )
+                if bname == "main_board" or w < 0.80:
+                    assert l >= 2.0 * w - 1e-6, (
+                        f"PCB plated slot {bname}:{ref}.{p.GetName()} length {l:.3f} mm < 2*W ({2.0*w:.3f} mm)!"
+                    )
+                checked_pcb_slots += 1
+
+    checked_drl_slots = 0
+    min_slot_w = 999.0
+    for bname in ("main_board", "ui_mezzanine"):
+        drl = ROOT / "manufacturing" / bname / "gerbers" / f"{bname}-PTH.drl"
+        assert drl.exists(), f"Missing exported drill file: {drl}"
+        tools: dict[str, float] = {}
+        cur_tool = None
+        for line in drl.read_text(encoding="utf-8").splitlines():
+            s = line.strip()
+            mt = re.match(r"^(T\d+)C([0-9.]+)$", s)
+            if mt:
+                tools[mt.group(1)] = float(mt.group(2))
+                continue
+            ms = re.match(r"^(T\d+)$", s)
+            if ms and ms.group(1) in tools:
+                cur_tool = ms.group(1)
+                continue
+            mg = re.match(r"^X([-\d.]+)Y([-\d.]+)G85X([-\d.]+)Y([-\d.]+)$", s)
+            if mg:
+                assert cur_tool is not None and cur_tool in tools, f"G85 slot without active tool in {drl}"
+                w = tools[cur_tool]
+                travel = math.hypot(float(mg.group(3)) - float(mg.group(1)), float(mg.group(4)) - float(mg.group(2)))
+                l = travel + w
+                if w < min_slot_w:
+                    min_slot_w = w
+                assert w >= 0.50 - 1e-6, (
+                    f"Excellon {drl.name} G85 slot tool {cur_tool}={w:.3f} mm < 0.50 mm JLCPCB 2-layer min!"
+                )
+                if bname == "main_board" or w < 0.80:
+                    assert l >= 2.0 * w - 1e-6, (
+                        f"Excellon {drl.name} G85 slot {s} length {l:.3f} mm < 2*W ({2.0*w:.3f} mm)!"
+                    )
+                checked_drl_slots += 1
+
+    assert checked_pcb_slots >= 14 and checked_drl_slots == checked_pcb_slots, (
+        f"Plated slot count mismatch: PCB={checked_pcb_slots}, PTH.drl={checked_drl_slots}"
+    )
+    print(
+        f"[PASS] Gate 1.7: All {checked_drl_slots} plated oval slots (PCB & PTH.drl) satisfy "
+        f"min width={min_slot_w:.3f} mm >= 0.50 mm and L >= 2*W"
+    )
+
+
 def main() -> int:
     check_portability()
     check_erc_and_drc()
@@ -437,6 +505,7 @@ def main() -> int:
     check_btb_mating_congruence()
     check_custom_courtyards()
     check_schematic_bounds_and_netlists()
+    check_plated_slots_dfm()
     return 0
 
 

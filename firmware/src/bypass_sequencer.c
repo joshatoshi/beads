@@ -26,7 +26,10 @@ void bypass_seq_set_target(bypass_seq_t *seq, bool active) {
 }
 
 bool bypass_seq_is_idle(const bypass_seq_t *seq) {
-    return (seq->state == BYP_STATE_IDLE) && !seq->photomos_mute && seq->por_cleared_once;
+    return (seq->state == BYP_STATE_IDLE) &&
+           !seq->photomos_mute &&
+           seq->por_cleared_once &&
+           (seq->target_active == seq->current_active);
 }
 
 static void update_fs1_flexi_switch(bypass_seq_t *seq, bool fs1_pressed_raw) {

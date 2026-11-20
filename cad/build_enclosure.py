@@ -260,11 +260,13 @@ def build_enclosure_shell(installed_inserts: bool = False) -> bd.Solid:
     north_plane = bd.Plane(origin=(sws["x_center"], 184.80, -29.60), x_dir=(-1.0, 0.0, 0.0), z_dir=(0.0, 1.0, 0.0))
     with bd.BuildPart() as bp_deboss:
         with bd.BuildSketch(north_plane):
-            with bd.Locations((-4.35, 0.0)):
+            with bd.Locations((-4.60, 0.0)):
                 bd.Text("B", font_size=4.00, font_style=bd.FontStyle.BOLD)
-            bd.Polygon([(-2.85, 0.0), (-1.20, 1.30), (-1.20, -1.30)], align=None)
-            bd.Polygon([(2.85, 0.0), (1.20, 1.30), (1.20, -1.30)], align=None)
-            with bd.Locations((4.35, 0.0)):
+            with bd.Locations((-1.75, 0.0)):
+                bd.Polygon([(-0.85, 0.0), (0.85, 1.25), (0.85, -1.25)])
+            with bd.Locations((1.75, 0.0)):
+                bd.Polygon([(0.85, 0.0), (-0.85, 1.25), (-0.85, -1.25)])
+            with bd.Locations((4.60, 0.0)):
                 bd.Text("A", font_size=4.00, font_style=bd.FontStyle.BOLD)
         bd.extrude(amount=1.00)
     cuts.extend(bp_deboss.part.solids())
@@ -1086,7 +1088,7 @@ def render_cross_section_and_wiring_diagrams(out_dir: pathlib.Path) -> None:
     box_2d(5.0, 75.8, 42.85, 171.35, (224, 242, 254), outline=(2, 132, 199), w=2)
     d2.text((xy(7.5, 168.0)[0], xy(7.5, 168.0)[1]), "LEFT 14 HP:\nfaceplate_14hp + ui_mezzanine", fill=(15, 23, 42), font=f_h2)
     box_2d(76.2, 147.0, 42.85, 171.35, (241, 245, 249), outline=(100, 116, 139), w=2)
-    d2.text((xy(78.5, 168.0)[0], xy(78.5, 168.0)[1]), "RIGHT 14 HP:\nMutable Instruments Beads", fill=(15, 23, 42), font=f_h2)
+    d2.text((xy(78.0, 169.5)[0], xy(78.0, 169.5)[1]), "RIGHT 14 HP:\nMutable Instruments Beads", fill=(15, 23, 42), font=f_h2)
 
     # North wall connectors
     n_labels = [
@@ -1104,7 +1106,7 @@ def render_cross_section_and_wiring_diagrams(out_dir: pathlib.Path) -> None:
     p_jpwr = xy(141.77, 162.6)
     d2.line([p_dc, p_jpwr], fill=(220, 38, 38), width=4)
     d2.ellipse([p_jpwr[0] - 6, p_jpwr[1] - 6, p_jpwr[0] + 6, p_jpwr[1] + 6], fill=(220, 38, 38))
-    d2.text((p_jpwr[0] - 64, p_jpwr[1] + 8), "J_PWR_IN", fill=(185, 28, 28), font=f_b)
+    d2.text((p_jpwr[0] - 58, p_jpwr[1] + 12), "J_PWR_IN", fill=(185, 28, 28), font=f_b)
 
     # 2. J_EURO_PWR (101.0, 48.1, rot=90 deg South of Beads PCB!) -> Beads 2x5 Power Header
     p_euro = xy(101.0, 48.1)
@@ -1259,7 +1261,7 @@ def main() -> int:
         subtitle="Flush 3mm Service Lid | 2-Layer main_board (Z=-38.4mm) | 18x M3 Brass Heat-Set Inserts | Stomp Load Pillars | 2x5 Red-Stripe Header",
         callouts=[
             ((76.0, 95.0, -76.0), (960, 915), "Flush 3.0mm PETG-HF Bottom Service Lid"),
-            ((76.0, 100.0, -39.2), (90, 560), "main_board (Top-Side JLCPCB SMT + 92.6% GND)"),
+            ((76.0, 100.0, -39.2), (90, 560), "main_board (Top-Side JLCPCB SMT + 92.5% GND)"),
             ((101.0, 48.1, -30.0), (1040, 740), "J_EURO_PWR South of Beads + 16.2mm IDC Plug"),
             ((108.5, 18.5, -41.5), (95, 790), "4x Full-Height Stomp Force Pillars"),
         ],

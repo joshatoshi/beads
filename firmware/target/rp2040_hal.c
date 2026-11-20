@@ -107,12 +107,25 @@
 
 #define USB_ADDR_ENDP        REG32(0x50110000u)
 #define USB_MAIN_CTRL        REG32(0x50110040u)
+#define USB_SOF_RD           REG32(0x50110048u)
 #define USB_SIE_CTRL         REG32(0x5011004Cu)
 #define USB_SIE_STATUS       REG32(0x50110050u)
 #define USB_BUFF_STATUS      REG32(0x50110058u)
 #define USB_EP_STALL_ARM     REG32(0x50110068u)
 #define USB_USB_MUXING       REG32(0x50110074u)
 #define USB_USB_PWR          REG32(0x50110078u)
+#define USB_INTR             REG32(0x5011008Cu)
+
+#define USB_SIE_CTRL_EP0_INT_1BUF_BITS            (1u << 29u)
+#define USB_SIE_CTRL_PULLUP_EN_BITS               (1u << 16u)
+#define USB_SIE_STATUS_BUS_RESET_BITS             (1u << 19u)
+#define USB_SIE_STATUS_SETUP_REC_BITS             (1u << 17u)
+#define USB_SIE_STATUS_CONNECTED_BITS             (1u << 16u)
+#define USB_SIE_STATUS_RESUME_BITS                (1u << 11u)
+#define USB_SIE_STATUS_SUSPENDED_BITS             (1u << 4u)
+#define USB_USB_PWR_VBUS_DETECT_BITS              (1u << 2u)
+#define USB_USB_PWR_VBUS_DETECT_OVERRIDE_EN_BITS  (1u << 3u)
+#define USB_INTR_DEV_SOF_BITS                     (1u << 17u)
 
 /* Top two 4 KB sectors of 16 MB W25Q128JVSIQ XIP Flash for A/B CRC32 persistence */
 #define FLASH_SLOT_A_XIP     0x10FFE000u
@@ -535,7 +548,8 @@ void hal_reset_usb_boot(uint32_t usb_activity_gpio_pin_mask, uint32_t disable_in
  * Bare-Metal RP2040 USB Device Stack (Composite USB-MIDI + CDC-ACM 1200bps)
  * Uses shared multi-packet EP0 engine (usb_ep0.c) verified by host unit tests.
  * ============================================================================ */
-static usb_ep0_state_t s_ep0;
+static usb_ep0_state_t  s_ep0;
+static usb_vbus_state_t s_usb_vbus;
 static uint8_t  s_ep1_pid = 0u;
 static uint8_t  s_ep3_out_pid = 0u;
 static uint8_t  s_usb_midi_rx_q[64];
@@ -616,8 +630,104 @@ static const usb_ep0_hw_t RP_USB_EP0_HW = {
     .ctx               = NULL,
 };
 
+static bool rp_usb_read_vbus_det(void *ctx) {
+    (void)ctx;
+    return hal_gpio_read(PIN_VBUS_DET);
+}
+
+static bool rp_usb_is_suspended(void *ctx) {
+    (void)ctx;
+    /* RP2040 USB_SIE_STATUS.SUSPENDED (bit 4) is WC (Write-1-to-Clear) and latches 3 ms after
+     * attach during USB 2.0 T_ATTDB pre-reset idle. Clear SUSPENDED & RESUME whenever a 1 kHz
+     * SOF (USB_INTR.DEV_SOF, cleared by reading USB_SOF_RD) or bus activity arrives so live
+     * active USB-MIDI sessions never trigger false hot-unplug SE0 probes! */
+    if ((USB_INTR & USB_INTR_DEV_SOF_BITS) != 0u) {
+        (void)USB_SOF_RD;
+        USB_SIE_STATUS = USB_SIE_STATUS_SUSPENDED_BITS | USB_SIE_STATUS_RESUME_BITS;
+        return false;
+    }
+    uint32_t sie = USB_SIE_STATUS;
+    if ((sie & (USB_SIE_STATUS_BUS_RESET_BITS | USB_SIE_STATUS_SETUP_REC_BITS | USB_SIE_STATUS_RESUME_BITS)) != 0u ||
+        USB_BUFF_STATUS != 0u) {
+        USB_SIE_STATUS = USB_SIE_STATUS_SUSPENDED_BITS | USB_SIE_STATUS_RESUME_BITS;
+        return false;
+    }
+    return (sie & USB_SIE_STATUS_SUSPENDED_BITS) != 0u;
+}
+
+static uint32_t rp_usb_time_us_32(void *ctx) {
+    (void)ctx;
+    return hal_time_us_32();
+}
+
+static void rp_usb_delay_us(void *ctx, uint32_t us) {
+    (void)ctx;
+    rp2040_delay_us(us);
+}
+
+static void rp_usb_set_pullup(void *ctx, bool en) {
+    (void)ctx;
+    if (en) {
+        USB_SIE_CTRL |= USB_SIE_CTRL_PULLUP_EN_BITS;
+    } else {
+        USB_SIE_CTRL &= ~USB_SIE_CTRL_PULLUP_EN_BITS;
+    }
+}
+
+static void rp_usb_on_attach(void *ctx) {
+    (void)ctx;
+    USB_ADDR_ENDP = 0u;
+    usb_ep0_bus_reset(&s_ep0);
+    s_ep1_pid = 0u;
+    s_ep3_out_pid = 0u;
+    s_usb_midi_q_len = 0u;
+    s_usb_midi_q_pos = 0u;
+    (void)USB_SOF_RD;
+    USB_BUFF_STATUS = 0xFFFFFFFFu;
+    USB_SIE_STATUS = USB_SIE_STATUS_BUS_RESET_BITS | USB_SIE_STATUS_SETUP_REC_BITS |
+                     USB_SIE_STATUS_CONNECTED_BITS | USB_SIE_STATUS_SUSPENDED_BITS |
+                     USB_SIE_STATUS_RESUME_BITS;
+    rp_ep1_out_arm(0u);
+    rp_ep3_out_arm(0u);
+    USB_USB_PWR = USB_USB_PWR_VBUS_DETECT_BITS | USB_USB_PWR_VBUS_DETECT_OVERRIDE_EN_BITS;
+    USB_SIE_CTRL |= USB_SIE_CTRL_PULLUP_EN_BITS;
+}
+
+static void rp_usb_on_detach(void *ctx) {
+    (void)ctx;
+    USB_SIE_CTRL &= ~USB_SIE_CTRL_PULLUP_EN_BITS;
+    USB_USB_PWR = USB_USB_PWR_VBUS_DETECT_OVERRIDE_EN_BITS; /* VBUS_DETECT = 0 */
+    USB_ADDR_ENDP = 0u;
+    usb_ep0_bus_reset(&s_ep0);
+    s_ep1_pid = 0u;
+    s_ep3_out_pid = 0u;
+    s_usb_midi_q_len = 0u;
+    s_usb_midi_q_pos = 0u;
+    USB_BUF_CTRL_IN(0u)  = 0u;
+    USB_BUF_CTRL_OUT(0u) = 0u;
+    USB_BUF_CTRL_OUT(1u) = 0u;
+    USB_BUF_CTRL_OUT(3u) = 0u;
+    (void)USB_SOF_RD;
+    USB_BUFF_STATUS = 0xFFFFFFFFu;
+    USB_SIE_STATUS = USB_SIE_STATUS_BUS_RESET_BITS | USB_SIE_STATUS_SETUP_REC_BITS |
+                     USB_SIE_STATUS_CONNECTED_BITS | USB_SIE_STATUS_SUSPENDED_BITS |
+                     USB_SIE_STATUS_RESUME_BITS;
+}
+
+static const usb_vbus_hw_t RP_USB_VBUS_HW = {
+    .read_vbus_det = rp_usb_read_vbus_det,
+    .is_suspended  = rp_usb_is_suspended,
+    .time_us_32    = rp_usb_time_us_32,
+    .delay_us      = rp_usb_delay_us,
+    .set_pullup    = rp_usb_set_pullup,
+    .on_attach     = rp_usb_on_attach,
+    .on_detach     = rp_usb_on_detach,
+    .ctx           = NULL,
+};
+
 void hal_usb_init_on_core1(void) {
     usb_ep0_init(&s_ep0);
+    usb_vbus_init(&s_usb_vbus);
     s_ep1_pid = 0u;
     s_ep3_out_pid = 0u;
     s_usb_midi_q_len = 0u;
@@ -625,9 +735,11 @@ void hal_usb_init_on_core1(void) {
 
     memset((void *)USB_DPRAM_BASE, 0, 4096u);
     USB_USB_MUXING = (1u << 0u) | (1u << 3u); /* TO_PHY | SOFTCON */
-    USB_USB_PWR    = (1u << 2u) | (1u << 3u); /* VBUS_DETECT | OVERRIDE_EN */
-    USB_MAIN_CTRL  = 1u;                      /* CONTROLLER_EN (Device mode) */
-    USB_SIE_CTRL   = (1u << 29u);             /* EP0_INT_1BUF */
+    /* Start with VBUS_DETECT = 0 & PULLUP_EN = 0 so +3.3V D+ pull-up NEVER back-feeds
+     * SRV05-4 -> J_USB.VBUS into powered-off (0V) hosts! Gated dynamically by PIN_VBUS_DET. */
+    USB_USB_PWR    = USB_USB_PWR_VBUS_DETECT_OVERRIDE_EN_BITS;
+    USB_MAIN_CTRL  = 1u;                              /* CONTROLLER_EN (Device mode) */
+    USB_SIE_CTRL   = USB_SIE_CTRL_EP0_INT_1BUF_BITS;  /* EP0_INT_1BUF, PULLUP_EN = 0 */
 
     /* Configure EP1 OUT (MIDI Bulk @ 0x0180), EP2 IN (CDC Int @ 0x0200),
      * EP3 OUT (CDC Data Bulk @ 0x0240), EP3 IN (CDC Data Bulk @ 0x0280).
@@ -637,22 +749,28 @@ void hal_usb_init_on_core1(void) {
     USB_EP_CTRL(2u, 1u) = EP_CTRL_ENABLE_BITS | EP_CTRL_INTERRUPT_PER_BUFFER | (3u << 26u) | 0x0200u;
     USB_EP_CTRL(3u, 0u) = EP_CTRL_ENABLE_BITS | EP_CTRL_INTERRUPT_PER_BUFFER | (2u << 26u) | 0x0240u;
     USB_EP_CTRL(3u, 1u) = EP_CTRL_ENABLE_BITS | EP_CTRL_INTERRUPT_PER_BUFFER | (2u << 26u) | 0x0280u;
-    rp_ep1_out_arm(0u);
-    rp_ep3_out_arm(0u);
 
-    USB_SIE_CTRL |= (1u << 16u);              /* PULLUP_EN = 1 */
+    /* Dynamically assert VBUS_DETECT & PULLUP_EN ONLY when PIN_VBUS_DET is HIGH */
+    (void)usb_vbus_sync(&s_usb_vbus, &RP_USB_VBUS_HW);
 }
 
 void hal_usb_task_on_core1(void) {
+    /* Dynamically gate PULLUP_EN & VBUS_DETECT on PIN_VBUS_DET (with SUSPENDED latch-break probe) */
+    if (!usb_vbus_sync(&s_usb_vbus, &RP_USB_VBUS_HW)) {
+        return;
+    }
+
     uint32_t sie = USB_SIE_STATUS;
 
     /* Bus Reset */
-    if ((sie & (1u << 19u)) != 0u) {
-        USB_SIE_STATUS = (1u << 19u);
+    if ((sie & USB_SIE_STATUS_BUS_RESET_BITS) != 0u) {
+        (void)USB_SOF_RD;
+        USB_SIE_STATUS = USB_SIE_STATUS_BUS_RESET_BITS | USB_SIE_STATUS_SUSPENDED_BITS | USB_SIE_STATUS_RESUME_BITS;
         USB_ADDR_ENDP = 0u;
         usb_ep0_bus_reset(&s_ep0);
         s_ep1_pid = 0u;
         s_ep3_out_pid = 0u;
+        s_usb_vbus.last_probe_us = hal_time_us_32();
         rp_ep1_out_arm(0u);
         rp_ep3_out_arm(0u);
     }
@@ -706,8 +824,8 @@ void hal_usb_task_on_core1(void) {
 
     /* EP0 SETUP packet received (serviced AFTER prior BUFF_STATUS completions) */
     sie = USB_SIE_STATUS;
-    if ((sie & (1u << 17u)) != 0u) {
-        USB_SIE_STATUS = (1u << 17u);
+    if ((sie & USB_SIE_STATUS_SETUP_REC_BITS) != 0u) {
+        USB_SIE_STATUS = USB_SIE_STATUS_SETUP_REC_BITS;
         uint8_t setup[8];
         for (uint8_t i = 0u; i < 8u; i++) {
             setup[i] = USB_SETUP_PKT[i];
