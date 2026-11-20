@@ -1,0 +1,328 @@
+(kicad_sch (version 20250114) (generator "eeschema") (generator_version "9.0")
+
+  (uuid 12fd1096-ea81-46c1-969b-b48612c4a5aa)
+
+  (paper "A4")
+
+  (lib_symbols
+  
+        	(symbol "Mechanical:MountingHole"
+    		(pin_names
+    			(offset 1.016)
+    		)
+    		(exclude_from_sim no)
+    		(in_bom no)
+    		(on_board yes)
+    		(property "Reference" "H"
+    			(at 0 5.08 0)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "Value" "MountingHole"
+    			(at 0 3.175 0)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "Footprint" ""
+    			(at 0 0 0)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    				(hide yes)
+    			)
+    		)
+    		(property "Datasheet" "~"
+    			(at 0 0 0)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    				(hide yes)
+    			)
+    		)
+    		(property "Description" "Mounting Hole without connection"
+    			(at 0 0 0)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    				(hide yes)
+    			)
+    		)
+    		(property "ki_keywords" "mounting hole"
+    			(at 0 0 0)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    				(hide yes)
+    			)
+    		)
+    		(property "ki_fp_filters" "MountingHole*"
+    			(at 0 0 0)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    				(hide yes)
+    			)
+    		)
+    		(symbol "MountingHole_0_1"
+    			(circle
+    				(center 0 0)
+    				(radius 1.27)
+    				(stroke
+    					(width 1.27)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    		)
+    		(embedded_fonts no)
+    	)
+  )
+
+    (symbol (lib_id "Mechanical:MountingHole") (at 59.69 59.69 0) (unit 1)
+    (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no)
+    (uuid "b995e2a6-1103-4dc4-9718-00247424df9b")
+    (property "Reference" "MH1"
+      (at 59.69 57.15 0)
+      (effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    )
+    (property "Value" "M3_Doepfer_TL"
+      (at 59.69 62.23 0)
+      (effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    )
+    (property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
+      (at 59.69 59.69 0)
+      (effects
+      	(hide yes)
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    )
+    (property "Datasheet" ""
+      (at 59.69 59.69 0)
+      (effects
+      	(hide yes)
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    )
+    (property "Description" "Mounting Hole without connection"
+      (at 59.69 59.69 0)
+      (effects
+      	(hide yes)
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    )
+    (instances
+      (project "faceplate_14hp"
+        (path "/12fd1096-ea81-46c1-969b-b48612c4a5aa"
+          (reference "MH1")
+          (unit 1)
+        )
+      )
+    )
+  )
+    (symbol (lib_id "Mechanical:MountingHole") (at 119.38 59.69 0) (unit 1)
+    (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no)
+    (uuid "4482994f-021c-4c89-ab23-7d30f9e24c56")
+    (property "Reference" "MH2"
+      (at 119.38 57.15 0)
+      (effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    )
+    (property "Value" "M3_Doepfer_TR"
+      (at 119.38 62.23 0)
+      (effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    )
+    (property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
+      (at 119.38 59.69 0)
+      (effects
+      	(hide yes)
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    )
+    (property "Datasheet" ""
+      (at 119.38 59.69 0)
+      (effects
+      	(hide yes)
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    )
+    (property "Description" "Mounting Hole without connection"
+      (at 119.38 59.69 0)
+      (effects
+      	(hide yes)
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    )
+    (instances
+      (project "faceplate_14hp"
+        (path "/12fd1096-ea81-46c1-969b-b48612c4a5aa"
+          (reference "MH2")
+          (unit 1)
+        )
+      )
+    )
+  )
+    (symbol (lib_id "Mechanical:MountingHole") (at 59.69 110.49 0) (unit 1)
+    (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no)
+    (uuid "85b6d063-9d9f-4937-b64f-f77f5e2294d4")
+    (property "Reference" "MH3"
+      (at 59.69 107.95 0)
+      (effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    )
+    (property "Value" "M3_Doepfer_BL"
+      (at 59.69 113.03 0)
+      (effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    )
+    (property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
+      (at 59.69 110.49 0)
+      (effects
+      	(hide yes)
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    )
+    (property "Datasheet" ""
+      (at 59.69 110.49 0)
+      (effects
+      	(hide yes)
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    )
+    (property "Description" "Mounting Hole without connection"
+      (at 59.69 110.49 0)
+      (effects
+      	(hide yes)
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    )
+    (instances
+      (project "faceplate_14hp"
+        (path "/12fd1096-ea81-46c1-969b-b48612c4a5aa"
+          (reference "MH3")
+          (unit 1)
+        )
+      )
+    )
+  )
+    (symbol (lib_id "Mechanical:MountingHole") (at 119.38 110.49 0) (unit 1)
+    (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no)
+    (uuid "d2a43e65-8b84-43ac-9aeb-0f08fa5b6e4a")
+    (property "Reference" "MH4"
+      (at 119.38 107.95 0)
+      (effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    )
+    (property "Value" "M3_Doepfer_BR"
+      (at 119.38 113.03 0)
+      (effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    )
+    (property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
+      (at 119.38 110.49 0)
+      (effects
+      	(hide yes)
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    )
+    (property "Datasheet" ""
+      (at 119.38 110.49 0)
+      (effects
+      	(hide yes)
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    )
+    (property "Description" "Mounting Hole without connection"
+      (at 119.38 110.49 0)
+      (effects
+      	(hide yes)
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    )
+    (instances
+      (project "faceplate_14hp"
+        (path "/12fd1096-ea81-46c1-969b-b48612c4a5aa"
+          (reference "MH4")
+          (unit 1)
+        )
+      )
+    )
+  )
+	(text "BEADS PEDALBOARD SKIFF - 14 HP (70.80 x 128.50 mm) MATTE-BLACK FR4 EURORACK FRONT PANEL\\n4x Doepfer M3 Mounting Holes (Y = 3.00 & 125.50 mm, X = 7.50 & 63.38 mm)\\nNon-electrical mechanical PCB - bare FR4 fabrication ($0 PCBA)."
+		(exclude_from_sim no)
+		(at 40 35 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "4704b8c1-f19d-4b18-89db-06ed2f05da1a")
+	)
+  (sheet_instances
+    (path "/" (page "1"))
+  )
+)

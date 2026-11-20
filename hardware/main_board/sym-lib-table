@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "beads_custom")(type "KiCad")(uri "${KIPRJMOD}/../beads_custom.kicad_sym")(options "")(descr "Beads Pedalboard Skiff custom verified symbols"))
+)

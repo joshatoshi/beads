@@ -1,0 +1,184 @@
+(footprint "BTB_Socket_2x08_P2.54mm_BottomMate"
+  (version 20241229)
+  (generator "kicad-mcp")
+  (generator_version "9.0")
+  (layer "F.Cu")
+  (descr "2x8 2.54mm THT Female Socket mounted on Bottom side (B.Cu) mating directly onto F.Cu 2x8 PinHeader with 0.000mm XY parity")
+  (tags "BTB PinSocket 2x08 2.54mm bottom mate")
+
+  (property "Reference" "REF**" (at 1.27 -2.8 0)
+    (layer "F.SilkS")
+    (uuid "4f1c2b16-770f-465d-ab30-f3552119549f")
+    (effects (font (size 1 1) (thickness 0.15)))
+  )
+  (property "Value" "BTB_Socket_2x08_P2.54mm_BottomMate" (at 1.27 20.6 0)
+    (layer "F.Fab")
+    (uuid "bece8e88-80fa-4e7d-947b-75abee53a144")
+    (effects (font (size 1 1) (thickness 0.15)))
+  )
+  (property "Datasheet" "" (at 0 0 0)
+    (layer "F.Fab")
+    (uuid "226eb37d-8cdb-4e83-b0b1-a6d051a15342")
+    (effects (font (size 1 1) (thickness 0.15)))
+  )
+
+  (fp_rect
+    (start -1.8 -1.8)
+    (end 4.34 19.58)
+    (stroke (width 0.05) (type default))
+    (fill none)
+    (layer "F.CrtYd")
+    (uuid "8deb6c7c-bff5-47bb-87a3-fe7f9df6b073")
+  )
+
+  (fp_rect
+    (start -1.4 -1.4)
+    (end 3.94 19.18)
+    (stroke (width 0.12) (type default))
+    (fill none)
+    (layer "F.SilkS")
+    (uuid "7acd6b47-b288-492f-8df4-bda842e3c518")
+  )
+
+  (fp_rect
+    (start -1.27 -1.27)
+    (end 3.81 19.05)
+    (stroke (width 0.1) (type default))
+    (fill none)
+    (layer "F.Fab")
+    (uuid "5c707ec3-4155-4385-a7b7-4a1143ad4878")
+  )
+
+  (pad "1" thru_hole rect
+    (at 0 0)
+    (size 1.7 1.7)
+    (drill 1)
+    (layers "*.Cu" "*.Mask")
+    (uuid "664c2d1f-4ea5-4eaa-9e95-f2dc6af29197")
+  )
+
+  (pad "2" thru_hole oval
+    (at 2.54 0)
+    (size 1.7 1.7)
+    (drill 1)
+    (layers "*.Cu" "*.Mask")
+    (uuid "a63da8d7-a817-44cd-b137-90a8909c9d69")
+  )
+
+  (pad "3" thru_hole oval
+    (at 0 2.54)
+    (size 1.7 1.7)
+    (drill 1)
+    (layers "*.Cu" "*.Mask")
+    (uuid "f019389d-2a85-4582-9724-604c6f52eace")
+  )
+
+  (pad "4" thru_hole oval
+    (at 2.54 2.54)
+    (size 1.7 1.7)
+    (drill 1)
+    (layers "*.Cu" "*.Mask")
+    (uuid "b14f3c57-5412-4fda-83c5-58e9ad4a9ad8")
+  )
+
+  (pad "5" thru_hole oval
+    (at 0 5.08)
+    (size 1.7 1.7)
+    (drill 1)
+    (layers "*.Cu" "*.Mask")
+    (uuid "c45e0cf0-ff01-4986-b01b-bfe5bb836d28")
+  )
+
+  (pad "6" thru_hole oval
+    (at 2.54 5.08)
+    (size 1.7 1.7)
+    (drill 1)
+    (layers "*.Cu" "*.Mask")
+    (uuid "07d816d7-e10e-4fc2-a63c-91c8074e848e")
+  )
+
+  (pad "7" thru_hole oval
+    (at 0 7.62)
+    (size 1.7 1.7)
+    (drill 1)
+    (layers "*.Cu" "*.Mask")
+    (uuid "938cd079-2770-48a8-a051-b8f30610fba7")
+  )
+
+  (pad "8" thru_hole oval
+    (at 2.54 7.62)
+    (size 1.7 1.7)
+    (drill 1)
+    (layers "*.Cu" "*.Mask")
+    (uuid "020c5d9c-4f85-46ad-bbc1-c94f872bf3db")
+  )
+
+  (pad "9" thru_hole oval
+    (at 0 10.16)
+    (size 1.7 1.7)
+    (drill 1)
+    (layers "*.Cu" "*.Mask")
+    (uuid "6fa56b37-eadd-405d-ab97-57cdc773f950")
+  )
+
+  (pad "10" thru_hole oval
+    (at 2.54 10.16)
+    (size 1.7 1.7)
+    (drill 1)
+    (layers "*.Cu" "*.Mask")
+    (uuid "6b7b4aa1-23aa-47fe-9925-e62cd4ca82bb")
+  )
+
+  (pad "11" thru_hole oval
+    (at 0 12.7)
+    (size 1.7 1.7)
+    (drill 1)
+    (layers "*.Cu" "*.Mask")
+    (uuid "48607f21-39a8-4937-ab55-e4ad9e4fe3c4")
+  )
+
+  (pad "12" thru_hole oval
+    (at 2.54 12.7)
+    (size 1.7 1.7)
+    (drill 1)
+    (layers "*.Cu" "*.Mask")
+    (uuid "5a78180d-6936-4705-8739-ddef8bf3c322")
+  )
+
+  (pad "13" thru_hole oval
+    (at 0 15.24)
+    (size 1.7 1.7)
+    (drill 1)
+    (layers "*.Cu" "*.Mask")
+    (uuid "46f6a2d4-614d-4813-9e3e-209a2be3ca05")
+  )
+
+  (pad "14" thru_hole oval
+    (at 2.54 15.24)
+    (size 1.7 1.7)
+    (drill 1)
+    (layers "*.Cu" "*.Mask")
+    (uuid "65d4a96b-6f6c-4b84-b2d7-7801f9c9c64c")
+  )
+
+  (pad "15" thru_hole oval
+    (at 0 17.78)
+    (size 1.7 1.7)
+    (drill 1)
+    (layers "*.Cu" "*.Mask")
+    (uuid "e4d70287-955e-47bd-910a-ae4a8981a75e")
+  )
+
+  (pad "16" thru_hole oval
+    (at 2.54 17.78)
+    (size 1.7 1.7)
+    (drill 1)
+    (layers "*.Cu" "*.Mask")
+    (uuid "45f666a6-621b-483b-b80c-c32c0b8d44b5")
+  )
+  (model "${KIPRJMOD}/../beads_custom.3dshapes/BTB_Socket_2x08_BottomMate.step"
+    (offset (xyz 0 0 0))
+    (scale (xyz 1 1 1))
+    (rotate (xyz 0 0 0))
+  )
+)
