@@ -23,7 +23,10 @@ if(DEFINED ENV{PICO_SDK_PATH} AND EXISTS "$ENV{PICO_SDK_PATH}/external/pico_sdk_
     # so SDK clocks, multicore FIFO, IRQ vectors, and flash lockout never collide.
     add_executable(beads_bridge ${BEADS_CORE_SRCS} target/pico_sdk_hal.c)
     target_include_directories(beads_bridge PRIVATE include)
-    target_compile_definitions(beads_bridge PRIVATE PICO_CORE1_STACK_SIZE=0x1000)
+    target_compile_definitions(beads_bridge PRIVATE
+        PICO_CORE1_STACK_SIZE=0x1000
+        PICO_FLASH_SIZE_BYTES=16777216
+    )
     target_compile_options(beads_bridge PRIVATE -Wall -Wextra -Werror -fstack-usage)
     target_link_libraries(beads_bridge pico_stdlib pico_multicore hardware_spi hardware_i2c hardware_adc hardware_uart hardware_flash)
     pico_add_extra_outputs(beads_bridge)

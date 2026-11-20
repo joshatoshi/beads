@@ -3339,7 +3339,7 @@
 	)
 	(symbol
 		(lib_id "Device:LED")
-		(at 240.03 170.18 0)
+		(at 240.03 151.13 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -3347,7 +3347,7 @@
 		(dnp no)
 		(uuid "aa6c126c-29f7-40a5-a522-71ce1522b216")
 		(property "Reference" "D_PEAK"
-			(at 240.03 167.64 0)
+			(at 240.03 148.58999999999997 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3355,7 +3355,7 @@
 			)
 		)
 		(property "Value" "LED_3mm_RED"
-			(at 240.03 172.72 0)
+			(at 240.03 153.67 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3363,7 +3363,7 @@
 			)
 		)
 		(property "Footprint" "LED_THT:LED_D3.0mm"
-			(at 240.03 170.18 0)
+			(at 240.03 151.13 0)
 			(effects
 				(hide yes)
 				(font
@@ -3372,7 +3372,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 240.03 170.18 0)
+			(at 240.03 151.13 0)
 			(effects
 				(hide yes)
 				(font
@@ -3381,7 +3381,7 @@
 			)
 		)
 		(property "Description" "Light emitting diode"
-			(at 240.03 170.18 0)
+			(at 240.03 151.13 0)
 			(effects
 				(hide yes)
 				(font
@@ -4285,7 +4285,7 @@
 		(uuid "2d6df94c-1ceb-4289-a388-3d81b2ac1bf0")
 	)
 	(label "GND"
-		(at 236.22 170.18 0)
+		(at 236.22 151.13 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -4295,7 +4295,7 @@
 		(uuid "13add957-fb10-41fe-bbe7-3bb0916244f8")
 	)
 	(label "LED_PEAK_ANODE"
-		(at 243.84 170.18 180)
+		(at 243.84 151.13 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -4344,7 +4344,7 @@
 		(at 214.63000000000002 132.07999999999998)
 		(uuid "cfba5809-3cea-49ec-afa8-bdb983d907f2")
 	)
-	(text "BEADS PEDALBOARD SKIFF - 14 HP UI & PATCH-BAY MEZZANINE (68.0 x 108.0 mm)\\nPure User Hand-Soldered THT Carrier ($0 JLCPCB PCBA Fee).\\nJP_OLED_PWR: Bridge 1-2 & 4-5 for GND-VCC-SCL-SDA OLEDs, or 2-3 & 5-6 for VCC-GND-SCL-SDA OLEDs."
+	(text "BEADS PEDALBOARD SKIFF - 14 HP UI & PATCH-BAY MEZZANINE (68.0 x 108.0 mm)\nPure User Hand-Soldered THT Carrier ($0 JLCPCB PCBA Fee).\nJP_OLED_PWR: Bridge 1-2 & 4-5 for GND-VCC-SCL-SDA OLEDs, or 2-3 & 5-6 for VCC-GND-SCL-SDA OLEDs."
 		(exclude_from_sim no)
 		(at 30 20 0)
 		(effects

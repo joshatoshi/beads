@@ -92,8 +92,10 @@
 #define ADC_RESULT           REG32(0x4004C004u)
 
 /* USBCTRL DPRAM (0x50100000) & Registers (0x50110000) */
-#define USB_DPRAM_BASE       0x50100000u
-#define USB_SETUP_PKT        ((volatile uint8_t *)(USB_DPRAM_BASE + 0x0000u))
+#define USB_DPRAM_BASE               0x50100000u
+#define EP_CTRL_ENABLE_BITS          (1u << 31u)
+#define EP_CTRL_INTERRUPT_PER_BUFFER (1u << 29u)
+#define USB_SETUP_PKT                ((volatile uint8_t *)(USB_DPRAM_BASE + 0x0000u))
 #define USB_EP_CTRL(ep, dir) REG32(USB_DPRAM_BASE + 0x0008u + (((ep) - 1u) * 8u) + ((dir) ? 0u : 4u))
 #define USB_BUF_CTRL_IN(ep)  REG32(USB_DPRAM_BASE + 0x0080u + ((ep) * 8u))
 #define USB_BUF_CTRL_OUT(ep) REG32(USB_DPRAM_BASE + 0x0084u + ((ep) * 8u))
@@ -628,11 +630,13 @@ void hal_usb_init_on_core1(void) {
     USB_SIE_CTRL   = (1u << 29u);             /* EP0_INT_1BUF */
 
     /* Configure EP1 OUT (MIDI Bulk @ 0x0180), EP2 IN (CDC Int @ 0x0200),
-     * EP3 OUT (CDC Data Bulk @ 0x0240), EP3 IN (CDC Data Bulk @ 0x0280) */
-    USB_EP_CTRL(1u, 0u) = (1u << 31u) | (2u << 26u) | 0x0180u;
-    USB_EP_CTRL(2u, 1u) = (1u << 31u) | (3u << 26u) | 0x0200u;
-    USB_EP_CTRL(3u, 0u) = (1u << 31u) | (2u << 26u) | 0x0240u;
-    USB_EP_CTRL(3u, 1u) = (1u << 31u) | (2u << 26u) | 0x0280u;
+     * EP3 OUT (CDC Data Bulk @ 0x0240), EP3 IN (CDC Data Bulk @ 0x0280).
+     * EP_CTRL_INTERRUPT_PER_BUFFER (1u << 29u) is mandatory on non-EP0 endpoints
+     * so USB_BUFF_STATUS bits 3 & 7 assert on transfer completion! */
+    USB_EP_CTRL(1u, 0u) = EP_CTRL_ENABLE_BITS | EP_CTRL_INTERRUPT_PER_BUFFER | (2u << 26u) | 0x0180u;
+    USB_EP_CTRL(2u, 1u) = EP_CTRL_ENABLE_BITS | EP_CTRL_INTERRUPT_PER_BUFFER | (3u << 26u) | 0x0200u;
+    USB_EP_CTRL(3u, 0u) = EP_CTRL_ENABLE_BITS | EP_CTRL_INTERRUPT_PER_BUFFER | (2u << 26u) | 0x0240u;
+    USB_EP_CTRL(3u, 1u) = EP_CTRL_ENABLE_BITS | EP_CTRL_INTERRUPT_PER_BUFFER | (2u << 26u) | 0x0280u;
     rp_ep1_out_arm(0u);
     rp_ep3_out_arm(0u);
 
@@ -653,18 +657,10 @@ void hal_usb_task_on_core1(void) {
         rp_ep3_out_arm(0u);
     }
 
-    /* EP0 SETUP packet received */
-    if ((sie & (1u << 17u)) != 0u) {
-        USB_SIE_STATUS = (1u << 17u);
-        uint8_t setup[8];
-        for (uint8_t i = 0u; i < 8u; i++) {
-            setup[i] = USB_SETUP_PKT[i];
-        }
-        usb_ep0_handle_setup(&s_ep0, setup, &RP_USB_EP0_HW);
-    }
-
     uint32_t bstat = USB_BUFF_STATUS;
     if (bstat != 0u) {
+        /* Service USB_BUFF_STATUS BEFORE SETUP_REC so a prior EP0_IN completion
+         * (e.g. SET_ADDRESS status ZLP) never overwrites a newly armed SETUP response! */
         /* EP0 IN complete (bit 0) -> multi-packet continuation or pending SET_ADDRESS */
         if ((bstat & (1u << 0u)) != 0u) {
             USB_BUFF_STATUS = (1u << 0u);
@@ -706,6 +702,17 @@ void hal_usb_task_on_core1(void) {
         if (rest != 0u) {
             USB_BUFF_STATUS = rest;
         }
+    }
+
+    /* EP0 SETUP packet received (serviced AFTER prior BUFF_STATUS completions) */
+    sie = USB_SIE_STATUS;
+    if ((sie & (1u << 17u)) != 0u) {
+        USB_SIE_STATUS = (1u << 17u);
+        uint8_t setup[8];
+        for (uint8_t i = 0u; i < 8u; i++) {
+            setup[i] = USB_SETUP_PKT[i];
+        }
+        usb_ep0_handle_setup(&s_ep0, setup, &RP_USB_EP0_HW);
     }
 }
 

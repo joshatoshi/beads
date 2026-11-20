@@ -394,9 +394,12 @@ void cv_engine_tick_2khz(cv_engine_t *eng, bypass_seq_t *byp, dac_bank_t *dacs,
     }
     if (midi->preset_req_valid) {
         midi->preset_req_valid = false;
-        const beads_preset_t *pr = preset_mgr_get(pm, midi->preset_req_idx);
-        cv_engine_load_preset(eng, pr, midi->preset_req_idx);
+        uint8_t idx = (midi->preset_req_idx < BEADS_NUM_PRESETS) ? midi->preset_req_idx : 0u;
+        const beads_preset_t *pr = preset_mgr_get(pm, idx);
+        cv_engine_load_preset(eng, pr, idx);
         bypass_seq_set_target(byp, pr->startup_active != 0u);
+        midi_router_set_channel(midi, pr->midi_channel);
+        pm->live.active_preset = idx;
     }
 
     /* 4. Encoder, UI buttons, FS2 Tap-Tempo/Freeze & ADC0 Guitar Envelope */

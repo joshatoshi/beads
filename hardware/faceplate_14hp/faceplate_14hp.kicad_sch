@@ -311,7 +311,7 @@
       )
     )
   )
-	(text "BEADS PEDALBOARD SKIFF - 14 HP (70.80 x 128.50 mm) MATTE-BLACK FR4 EURORACK FRONT PANEL\\n4x Doepfer M3 Mounting Holes (Y = 3.00 & 125.50 mm, X = 7.50 & 63.38 mm)\\nNon-electrical mechanical PCB - bare FR4 fabrication ($0 PCBA)."
+	(text "BEADS PEDALBOARD SKIFF - 14 HP (70.80 x 128.50 mm) MATTE-BLACK FR4 EURORACK FRONT PANEL\n4x Doepfer M3 Mounting Holes (Y = 3.00 & 125.50 mm, X = 7.50 & 63.38 mm)\nNon-electrical mechanical PCB - bare FR4 fabrication ($0 PCBA)."
 		(exclude_from_sim no)
 		(at 40 35 0)
 		(effects

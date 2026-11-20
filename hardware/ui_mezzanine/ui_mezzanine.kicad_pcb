@@ -452,7 +452,7 @@
 			)
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Connector_Audio.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
+		(model "${KIPRJMOD}/../beads_custom.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -803,7 +803,7 @@
 			)
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Connector_Audio.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
+		(model "${KIPRJMOD}/../beads_custom.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -1154,7 +1154,7 @@
 			)
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Connector_Audio.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
+		(model "${KIPRJMOD}/../beads_custom.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -1505,7 +1505,7 @@
 			)
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Connector_Audio.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
+		(model "${KIPRJMOD}/../beads_custom.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -1856,7 +1856,7 @@
 			)
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Connector_Audio.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
+		(model "${KIPRJMOD}/../beads_custom.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -2207,7 +2207,7 @@
 			)
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Connector_Audio.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
+		(model "${KIPRJMOD}/../beads_custom.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -2558,7 +2558,7 @@
 			)
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Connector_Audio.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
+		(model "${KIPRJMOD}/../beads_custom.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -3050,7 +3050,7 @@
 			)
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Connector_Audio.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
+		(model "${KIPRJMOD}/../beads_custom.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -3388,7 +3388,7 @@
 			(uuid "9d5c43b9-83c7-4128-94e1-52013cb1e4c0")
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Button_Switch_THT.3dshapes/SW_PUSH_6mm_H13mm.step"
+		(model "${KIPRJMOD}/../beads_custom.3dshapes/SW_PUSH_6mm_H13mm.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -3739,7 +3739,7 @@
 			)
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Connector_Audio.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
+		(model "${KIPRJMOD}/../beads_custom.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -3972,7 +3972,7 @@
 			(uuid "37388227-b32d-4ef4-a596-bee1c8528a5d")
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/LED_THT.3dshapes/LED_D3.0mm.step"
+		(model "${KIPRJMOD}/../beads_custom.3dshapes/LED_D3.0mm.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -4324,7 +4324,7 @@
 			)
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Connector_Audio.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
+		(model "${KIPRJMOD}/../beads_custom.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -4675,7 +4675,7 @@
 			)
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Connector_Audio.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
+		(model "${KIPRJMOD}/../beads_custom.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -5007,7 +5007,7 @@
 			(uuid "9ec1301e-f56a-42be-b374-e235d6e5bcf4")
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Potentiometer_THT.3dshapes/Potentiometer_Alpha_RD902F-40-00D_Dual_Vertical.step"
+		(model "${KIPRJMOD}/../beads_custom.3dshapes/Potentiometer_Dual_9mm_Vertical.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -5359,7 +5359,7 @@
 			)
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Connector_Audio.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
+		(model "${KIPRJMOD}/../beads_custom.3dshapes/Jack_3.5mm_QingPu_WQP-PJ398SM_Vertical.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -5765,7 +5765,7 @@
 			(uuid "cbf49795-20db-47a9-8f9c-613140683423")
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Rotary_Encoder.3dshapes/RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm_CircularMountingHoles.step"
+		(model "${KIPRJMOD}/../beads_custom.3dshapes/RotaryEncoder_Alps_EC11E_H20mm.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -6097,7 +6097,7 @@
 			(uuid "b187adc8-0741-491d-8c0c-d8aac975252d")
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Potentiometer_THT.3dshapes/Potentiometer_Alpha_RD902F-40-00D_Dual_Vertical.step"
+		(model "${KIPRJMOD}/../beads_custom.3dshapes/Potentiometer_Dual_9mm_Vertical.step"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -6362,7 +6362,7 @@
 			(uuid "4c176a48-0f25-484e-a8e6-35e8fbb0a74e")
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x04_P2.54mm_Vertical.step"
+		(model "${KIPRJMOD}/../beads_custom.3dshapes/PinSocket_1x04_P2.54mm_Vertical.step"
 			(offset
 				(xyz 0 0 0)
 			)

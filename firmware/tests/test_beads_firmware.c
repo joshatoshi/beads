@@ -751,7 +751,19 @@ static void test_oled_ui_complete_and_midi_div6(void) {
         if (eng.master_clk_pulse) pulses_16th++;
     }
     assert(pulses_16th == 4);
-    printf("[PASS] Test 9: Complete OLED UI (CHANNEL 7-field/PRESET recall/SYSTEM MIDI+1V-Oct Cal) & MIDI /6 wrap\n");
+
+    /* 5. MIDI Program Change recall via cv_engine_tick_2khz MUST sync midi_channel & pm.live.active_preset! */
+    pm.live.presets[3].startup_active = 1u;
+    pm.live.presets[3].midi_channel = 11u;
+    midi_router_set_channel(&mr, 0u); /* Omni to receive PC #3 */
+    uint8_t usb_pc3[4] = { 0x0Cu, 0xC0u, 3u, 0u };
+    assert(midi_router_usb_push_packet(&mr, usb_pc3));
+    cv_engine_tick_2khz(&eng, &byp, &dacs, &mr, &pm, 500000u);
+    assert(eng.active_preset_idx == 3u);
+    assert(pm.live.active_preset == 3u);
+    assert(byp.target_active == true);
+    assert(mr.uart_parser.rx_channel == 11u);
+    printf("[PASS] Test 9: Complete OLED UI, MIDI /6 wrap & MIDI PC channel/active_preset sync\n");
 }
 
 int main(void) {

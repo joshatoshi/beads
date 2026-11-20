@@ -227,9 +227,48 @@ def check_bcu_pour_and_mh_and_paste() -> None:
                 if abs(lx) < sx / 2.0 + vr and abs(ly) < sy / 2.0 + vr:
                     raise AssertionError(f"Via-in-paste collision on {ref}.{pp.GetName()} F.Paste at via ({vx:.2f},{vy:.2f})!")
 
+    # Verify every NPTH locating hole on main_board has >= 0.35 mm FR4 web to Edge.Cuts (JLCPCB >= 0.25-0.30 mm)
+    edge_segs = [
+        (
+            pcbnew.ToMM(d.GetStart().x), pcbnew.ToMM(d.GetStart().y),
+            pcbnew.ToMM(d.GetEnd().x), pcbnew.ToMM(d.GetEnd().y),
+        )
+        for d in b.GetDrawings()
+        if d.GetLayer() == pcbnew.Edge_Cuts and isinstance(d, pcbnew.PCB_SHAPE)
+    ]
+    assert len(edge_segs) >= 12, f"Expected notched Edge.Cuts (>=12 segs), got {len(edge_segs)}"
+    min_npth_web = 999.0
+    for fp in b.GetFootprints():
+        ref = fp.GetReference()
+        for p in fp.Pads():
+            if p.GetAttribute() != pcbnew.PAD_ATTRIB_NPTH:
+                continue
+            px, py = pcbnew.ToMM(p.GetPosition().x), pcbnew.ToMM(p.GetPosition().y)
+            r = max(pcbnew.ToMM(p.GetDrillSize().x), pcbnew.ToMM(p.GetDrillSize().y)) / 2.0
+            d_edge = min(seg_dist(px, py, x1, y1, x2, y2) for x1, y1, x2, y2 in edge_segs) - r
+            if d_edge < min_npth_web:
+                min_npth_web = d_edge
+            assert d_edge >= 0.35, f"NPTH hole on {ref} at ({px:.2f},{py:.2f}) has thin FR4 edge web {d_edge:.3f}mm < 0.35mm!"
+
+    # Verify local ${KIPRJMOD}/../beads_custom.3dshapes/*.step links on SW_MIDI_AB (main_board) & 21/21 ui_mezzanine
+    sw_models = [m.m_Filename for m in fps["SW_MIDI_AB"].Models()]
+    assert sw_models == ["${KIPRJMOD}/../beads_custom.3dshapes/SW_CK_JS202011AQN_DPDT_Angled.step"], (
+        f"SW_MIDI_AB missing local STEP link: {sw_models}"
+    )
+    mz_chk = pcbnew.LoadBoard(str(ROOT / "hardware" / "ui_mezzanine" / "ui_mezzanine.kicad_pcb"))
+    for fp in mz_chk.GetFootprints():
+        ms = [m.m_Filename for m in fp.Models()]
+        assert len(ms) == 1 and ms[0].startswith("${KIPRJMOD}/../beads_custom.3dshapes/"), (
+            f"ui_mezzanine {fp.GetReference()} missing local STEP link: {ms}"
+        )
+        assert (ROOT / "hardware" / "beads_custom.3dshapes" / pathlib.Path(ms[0]).name).exists(), (
+            f"Missing STEP file for ui_mezzanine {fp.GetReference()}: {ms[0]}"
+        )
+
     print(
         f"[PASS] Gate 1.3: main_board B.Cu GND largest island={pct:.2f}% (>={min_pct:.0f}%, 0 un-stitched islands), "
-        f"bulk power trunks >=0.50mm, MH min clr={min_mh_clr:.2f}mm, U_MCU EP={len(mcu_ep_vias)} GND vias, 0 via-in-paste"
+        f"bulk power trunks >=0.50mm, MH min clr={min_mh_clr:.2f}mm, NPTH min web={min_npth_web:.3f}mm (>=0.35mm), "
+        f"U_MCU EP={len(mcu_ep_vias)} GND vias, 0 via-in-paste, 21/21 ui_mezzanine + SW_MIDI_AB local STEPs linked"
     )
 
 
@@ -281,12 +320,123 @@ def check_custom_courtyards() -> None:
     print(f"[PASS] Gate 1.5: All {checked} custom footprints satisfy F.CrtYd >= F.Fab")
 
 
+def check_schematic_bounds_and_netlists() -> None:
+    """Gate 1.6: Verify 100% of schematic symbols/labels/texts fit inside page borders & clear of
+    title block, zero literal \\\\n in notes, clean sheet_instances, and synced .net files."""
+    PAPER_MM = {
+        "A4": (297.0, 210.0),
+        "A3": (420.0, 297.0),
+        "A2": (594.0, 420.0),
+        "A1": (841.0, 594.0),
+        "A0": (1189.0, 841.0),
+    }
+    checked_sheets = 0
+    for sch in sorted((ROOT / "hardware").rglob("*.kicad_sch")):
+        txt = sch.read_text(encoding="utf-8")
+        m_pap = re.search(r'\(paper\s+"([^"]+)"\)', txt)
+        assert m_pap and m_pap.group(1) in PAPER_MM, f"Unsupported/missing paper size in {sch}"
+        pw, ph = PAPER_MM[m_pap.group(1)]
+        margin = 10.0
+        tb_x1, tb_y1 = pw - margin - 110.0, ph - margin - 35.0
+
+        # Strip embedded (lib_symbols ...) before checking placed coordinates
+        ls_idx = txt.find("(lib_symbols")
+        body = txt
+        if ls_idx != -1:
+            depth = 0
+            i = ls_idx
+            while i < len(txt):
+                if txt[i] == "(":
+                    depth += 1
+                elif txt[i] == ")":
+                    depth -= 1
+                    if depth == 0:
+                        body = txt[:ls_idx] + txt[i + 1 :]
+                        break
+                i += 1
+
+        # Zero literal double-escaped \\n inside (text "...") annotations
+        for tm in re.finditer(r'\(text\s+"((?:[^"\\]|\\.)*)"', body):
+            assert "\\\\n" not in tm.group(1), f"Literal \\\\n found in schematic text of {sch}: {tm.group(1)[:60]!r}"
+
+        # Check all placed symbol/label/text/wire coordinates against inner drawing border & title block
+        for tag in ("symbol", "global_label", "label", "hierarchical_label", "text", "no_connect"):
+            pos = 0
+            while True:
+                idx = body.find(f"({tag}", pos)
+                if idx == -1:
+                    break
+                # Ensure exact token match (followed by whitespace)
+                nxt = body[idx + len(tag) + 1 : idx + len(tag) + 2]
+                if nxt not in (" ", "\t", "\n", "\r"):
+                    pos = idx + 1
+                    continue
+                depth = 0
+                j = idx
+                while j < len(body):
+                    if body[j] == "(":
+                        depth += 1
+                    elif body[j] == ")":
+                        depth -= 1
+                        if depth == 0:
+                            blk = body[idx : j + 1]
+                            pos = j + 1
+                            break
+                    j += 1
+                m_at = re.search(r'\(at\s+([-\d.]+)\s+([-\d.]+)', blk)
+                if not m_at:
+                    continue
+                x, y = float(m_at.group(1)), float(m_at.group(2))
+                assert margin <= x <= pw - margin and margin <= y <= ph - margin, (
+                    f"Out-of-border {tag} at ({x:.2f}, {y:.2f}) on {sch.name} ({m_pap.group(1)} inner [{margin},{pw-margin}]x[{margin},{ph-margin}])"
+                )
+                assert not (x >= tb_x1 and y >= tb_y1), (
+                    f"Title-block overlap for {tag} at ({x:.2f}, {y:.2f}) on {sch.name} (title block X>={tb_x1:.1f}, Y>={tb_y1:.1f})"
+                )
+
+        # On main_board.kicad_sch verify sheet_instances has exact sequential pages 1..5 (no stale orphan UUIDs)
+        if sch.name == "main_board.kicad_sch":
+            sheet_uuids = re.findall(r'\(sheet\b.*?\(uuid\s+"([^"]+)"\)', body, re.S)
+            si_m = re.search(r'\(sheet_instances\b(.*)\)\s*$', body, re.S)
+            assert si_m, "Missing sheet_instances in main_board.kicad_sch"
+            pages = re.findall(r'\(page\s+"(\d+)"\)', si_m.group(1))
+            assert pages == [str(i) for i in range(1, len(sheet_uuids) + 2)], (
+                f"Non-sequential or stale sheet_instances in main_board.kicad_sch: pages={pages}, sheets={len(sheet_uuids)}"
+            )
+        checked_sheets += 1
+
+    # Verify tracked *.net files match fresh kicad-cli export (nets + net classes) & have zero .lane paths
+    for b in ("main_board", "ui_mezzanine", "faceplate_14hp"):
+        sch = ROOT / "hardware" / b / f"{b}.kicad_sch"
+        tracked_net = ROOT / "hardware" / b / f"{b}.net"
+        assert tracked_net.exists(), f"Missing tracked netlist {tracked_net}"
+        tr_txt = tracked_net.read_text(encoding="utf-8")
+        assert ".lane/trees/" not in tr_txt, f"Ephemeral .lane path leaked into {tracked_net}"
+        fresh_net = SCRATCH / f"{b}_fresh.net"
+        r = subprocess.run(["kicad-cli", "sch", "export", "netlist", "-o", str(fresh_net), str(sch)], capture_output=True, text=True)
+        assert r.returncode == 0, f"Netlist export failed on {b}: {r.stderr}"
+        def _norm(s: str) -> str:
+            s = re.sub(r'\(date\s+"[^"]*"\)', '(date "")', s)
+            s = re.sub(r'\(source\s+"[^"]*"\)', '(source "")', s)
+            s = re.sub(r'\(uri\s+"[^"]*"\)', '(uri "")', s)
+            return s
+        assert _norm(tr_txt) == _norm(fresh_net.read_text(encoding="utf-8")), (
+            f"Tracked {tracked_net.name} is out of sync with {sch.name}!"
+        )
+
+    print(
+        f"[PASS] Gate 1.6: All {checked_sheets} schematic sheets within page borders & clear of title block, "
+        f"zero literal \\\\n, clean sheet_instances 1..5, and 3/3 .net files synced"
+    )
+
+
 def main() -> int:
     check_portability()
     check_erc_and_drc()
     check_bcu_pour_and_mh_and_paste()
     check_btb_mating_congruence()
     check_custom_courtyards()
+    check_schematic_bounds_and_netlists()
     return 0
 
 

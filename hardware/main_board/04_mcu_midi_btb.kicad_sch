@@ -3,7 +3,7 @@
 	(generator "eeschema")
 	(generator_version "9.0")
 	(uuid 99716ea2-39a7-4bf1-a957-1caf90699d41)
-	(paper "A4")
+	(paper "A2")
 	(lib_symbols
 		(symbol "Switch:SW_DPDT_x2"
 			(pin_names
@@ -4670,6 +4670,7 @@
 	(symbol
 		(lib_id "Switch:SW_DPDT_x2")
 		(at 250.19 64.77 0)
+		(mirror x)
 		(unit 2)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -5269,7 +5270,7 @@
 		(uuid "41b28fed-4283-43ae-9bca-61744a9d5ce1")
 	)
 	(global_label "MIDI_IN_TIP"
-		(at 255.27 62.23 180)
+		(at 255.27 67.31 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -5289,7 +5290,7 @@
 		(uuid "09cc3e4e-ffd6-4188-a8d2-1f7198784841")
 	)
 	(global_label "MIDI_IN_RING"
-		(at 255.27 67.31 180)
+		(at 255.27 62.23 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -11724,6 +11725,17 @@
 			(justify right)
 		)
 		(uuid "41732eeb-72bb-4bb7-b1d8-774e6800d52e")
+	)
+	(text "SW_MIDI_AB (C&K JS202011AQN, PCB rot=180 deg, CCW Row-2 pins 6-5-4):\nUnit 2 mirrored vertically to align throws: TOP = Type B (1=TIP, 6=RING),\nBOTTOM = Type A (3=RING, 4=TIP). Zero optocoupler short."
+		(exclude_from_sim no)
+		(at 218.44 81.28 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "daffce29-b047-4f63-b689-c787321ab83f")
 	)
 	(sheet_instances
 		(path "/"
